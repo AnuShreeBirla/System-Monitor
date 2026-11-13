@@ -1,3 +1,4 @@
+// Modules
 const {
   app,
   BrowserWindow,
@@ -10,6 +11,10 @@ const os = require('os');
 const path = require('path');
 const si = require('systeminformation');
 
+// Constants
+const openWhenLogedIn = true;
+
+// Variables
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
@@ -27,10 +32,11 @@ ipcMain.on('set-memory-threshold', (_event, threshold) => {
   }
 });
 
-function createWindow() {
+function createWindow(options = {}) {
     mainWindow = new BrowserWindow({
       width: 900,
       height: 600,
+      show: options.show ?? true,
       webPreferences: {
         preload: path.join(__dirname, "preload.cjs"),
         contextIsolation: true,
@@ -93,6 +99,20 @@ function createTray() {
     tray.on('click', () => {
         mainWindow.show();
     });
+}
+
+function configureStartup(open) {
+
+    app.setLoginItemSettings({
+        openAtLogin: open
+    });
+
+    const loginSettings = app.getLoginItemSettings();
+    const wasOpenedAtLogin = loginSettings.wasOpenedAtLogin;
+
+    const startHidden = wasOpenedAtLogin;
+
+    return startHidden;
 }
 
 let cpuUsage = 0;
@@ -175,8 +195,10 @@ function updateSystemUsage() {
 }
 
 app.whenReady().then(() => {
-    createWindow();
+    const startHidden = configureStartup(openWhenLogedIn);
+    createWindow({show: !startHidden});
     createTray();
+
     setInterval(updateSystemUsage, 1000);
     updateBatteryStatus();
     setInterval(updateBatteryStatus, 10000);
