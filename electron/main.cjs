@@ -1,31 +1,89 @@
-const { app, BrowserWindow, Menu, Tray } = require("electron");
-const path = require("path");
+const { 
+    app, 
+    BrowserWindow, 
+    Tray, 
+    Menu 
+} = require('electron');
 
-let tray = null
+const path = require('path');
+
+let mainWindow = null;
+let tray = null;
+let isQuitting = false;
+
+function createWindow() {
+    mainWindow = new BrowserWindow({
+      width: 900,
+      height: 600,
+      webPreferences: {
+        preload: path.join(__dirname, "preload.cjs"),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+    
+
+    mainWindow.loadURL('http://localhost:5173');
+
+    // Hide instead of closing
+    mainWindow.on('close', (event) => {
+        if (!isQuitting) {
+            event.preventDefault();
+            mainWindow.hide();
+        }
+    });
+}
+
+function createTray() {
+    const iconPath = path.join(
+        __dirname,
+        'assets',
+        'temp-tray-44.png'
+    );
+
+    tray = new Tray(iconPath);
+
+    tray.setToolTip('Resource Monitor');
+
+    const contextMenu = Menu.buildFromTemplate([
+        {
+            label: 'Open Dashboard',
+            click: () => {
+                mainWindow.show();
+            }
+        },
+        {
+            label: 'Pause Monitoring',
+            type: 'checkbox',
+            checked: false,
+            click: (item) => {
+                console.log('Monitoring paused:', item.checked);
+            }
+        },
+        {
+            type: 'separator'
+        },
+        {
+            label: 'Quit',
+            click: () => {
+                isQuitting = true;
+                app.quit();
+            }
+        }
+    ]);
+
+    tray.setContextMenu(contextMenu);
+
+    tray.on('click', () => {
+        mainWindow.show();
+    });
+}
+
 app.whenReady().then(() => {
-  const window = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
+    createWindow();
+    createTray();
+});
 
-  const iconPath = path.join(__dirname, 'assets','temp-tray-44.png');
-  tray = new Tray(iconPath);
-
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Item1', type: 'radio' },
-    { label: 'Item2', type: 'radio' },
-    { label: 'Item3', type: 'radio', checked: true },
-    { label: 'Item4', type: 'radio' }
-  ])
-  tray.setToolTip('System Monitor')
-  tray.setContextMenu(contextMenu)
-
-
-
-  window.loadURL("http://localhost:5173");
+app.on('before-quit', () => {
+    isQuitting = true;
 });
