@@ -119,7 +119,8 @@ function updateSystemUsage() {
   }
 
   previousCpuTimes = currentCpuTimes;
-  tray?.setToolTip(`CPU: ${cpuUsage}% | Memory: ${memoryUsage}%`);
+  tray?.setToolTip(
+  `CPU: ${cpuUsage}% | Memory: ${memoryUsage}% | Battery: ${batteryStatus?.hasBattery? `${batteryStatus.percent}% (${batteryStatus.acConnected ? 'Plugged in' : 'Not plugged in'})`: 'Unavailable'}`);
   mainWindow?.webContents.send('cpu-usage', cpuUsage);
   mainWindow?.webContents.send('memory-usage', memoryUsage);
 }
