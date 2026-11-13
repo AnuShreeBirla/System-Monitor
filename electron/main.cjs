@@ -4,7 +4,7 @@ const {
     Tray, 
     Menu 
 } = require('electron');
-
+const os = require('os');
 const path = require('path');
 
 let mainWindow = null;
@@ -79,9 +79,38 @@ function createTray() {
     });
 }
 
+let cpuUsage = 0;
+let previousCpuTimes = getCpuTimes();
+
+function getCpuTimes() {
+  let total = 0;
+  let idle = 0;
+
+  for (const cpu of os.cpus()) {
+    idle += cpu.times.idle;
+    total += Object.values(cpu.times).reduce((sum, time) => sum + time, 0);
+  }
+
+  return { total, idle };
+}
+
+function updateCpuUsage() {
+  const currentCpuTimes = getCpuTimes();
+  const totalDiff = currentCpuTimes.total - previousCpuTimes.total;
+  const idleDiff = currentCpuTimes.idle - previousCpuTimes.idle;
+
+  if (totalDiff > 0) {
+    cpuUsage = Math.round((1 - idleDiff / totalDiff) * 100);
+  }
+
+  previousCpuTimes = currentCpuTimes;
+  mainWindow?.webContents.send('cpu-usage', cpuUsage);
+}
+
 app.whenReady().then(() => {
     createWindow();
     createTray();
+    setInterval(updateCpuUsage, 1000);
 });
 
 app.on('before-quit', () => {

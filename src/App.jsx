@@ -1,9 +1,15 @@
 import './App.css';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 function App() {
   const [memoryLimit, setMemoryLimit] = useState(80);
   const logs = [];
+
+  const [cpuUsage, setCpuUsage] = useState(null);
+  useEffect(() => {
+    return window.electronAPI.onCpuUsage(setCpuUsage);
+  }, []);
+
   return (
     <main className="dashboard">
       <h1>System Monitor</h1>
@@ -11,7 +17,7 @@ function App() {
       <div className="cards">
         <section className="card">
           <h2>CPU Usage</h2>
-          <p>Waiting for CPU data…</p>
+          <p>{cpuUsage === null ? 'Waiting for CPU data…' : `${cpuUsage}%`}</p>
         </section>
 
         <section className="card">
