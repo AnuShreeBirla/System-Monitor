@@ -94,8 +94,10 @@ function getCpuTimes() {
   return { total, idle };
 }
 
-function updateCpuUsage() {
+function updateSystemUsage() {
   const currentCpuTimes = getCpuTimes();
+  const totalMemory = os.totalmem();
+  memoryUsage = Math.round(((totalMemory - os.freemem()) / totalMemory) * 100);
   const totalDiff = currentCpuTimes.total - previousCpuTimes.total;
   const idleDiff = currentCpuTimes.idle - previousCpuTimes.idle;
 
@@ -105,12 +107,15 @@ function updateCpuUsage() {
 
   previousCpuTimes = currentCpuTimes;
   mainWindow?.webContents.send('cpu-usage', cpuUsage);
+  mainWindow?.webContents.send('memory-usage', memoryUsage);
 }
+
+let memoryUsage = 0;
 
 app.whenReady().then(() => {
     createWindow();
     createTray();
-    setInterval(updateCpuUsage, 1000);
+    setInterval(updateSystemUsage, 1000);
 });
 
 app.on('before-quit', () => {

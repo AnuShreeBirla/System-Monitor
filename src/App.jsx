@@ -6,8 +6,16 @@ function App() {
   const logs = [];
 
   const [cpuUsage, setCpuUsage] = useState(null);
+  const [memoryUsage, setMemoryUsage] = useState(null);
   useEffect(() => {
-    return window.electronAPI.onCpuUsage(setCpuUsage);
+    const removeCpuListener = window.electronAPI.onCpuUsage(setCpuUsage);
+    const removeMemoryListener =
+      window.electronAPI.onMemoryUsage(setMemoryUsage);
+
+    return () => {
+      removeCpuListener();
+      removeMemoryListener();
+    }; 
   }, []);
 
   return (
@@ -22,7 +30,7 @@ function App() {
 
         <section className="card">
           <h2>Memory Usage</h2>
-          <p>Coming next</p>
+          <p>{memoryUsage === null ? 'Waiting for memory data…' : `${memoryUsage}%`}</p>
         </section>
 
         <section className="card">

@@ -7,4 +7,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     return () => ipcRenderer.removeListener('cpu-usage', listener);
   },
+  onMemoryUsage(callback) {
+  const listener = (_event, memoryUsage) => callback(memoryUsage);
+  ipcRenderer.on('memory-usage', listener);
+
+  return () => ipcRenderer.removeListener('memory-usage', listener);
+  },
 });
