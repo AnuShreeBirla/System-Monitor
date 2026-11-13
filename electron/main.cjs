@@ -119,6 +119,7 @@ function updateSystemUsage() {
   }
 
   previousCpuTimes = currentCpuTimes;
+  tray?.setToolTip(`CPU: ${cpuUsage}%`);
   mainWindow?.webContents.send('cpu-usage', cpuUsage);
   mainWindow?.webContents.send('memory-usage', memoryUsage);
 }
