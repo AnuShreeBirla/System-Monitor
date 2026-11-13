@@ -51,7 +51,12 @@ function App() {
           min="1"
           max="100"
           value={memoryLimit}
-          onChange={(event) => setMemoryLimit(Number(event.target.value))}
+          onChange={(event) => {const threshold = Number(event.target.value);
+          if (threshold >= 1 && threshold <= 100) {
+            setMemoryLimit(threshold);
+            window.electronAPI.setMemoryThreshold(threshold);
+            }
+          }}
         />
         <span>%</span>
       </section>

@@ -19,4 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   return () => ipcRenderer.removeListener('battery-status', listener);
   },
+  setMemoryThreshold(threshold) {
+  ipcRenderer.send('set-memory-threshold', threshold);
+  },
 });

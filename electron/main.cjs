@@ -1,8 +1,10 @@
-const { 
-    app, 
-    BrowserWindow, 
-    Tray, 
-    Menu 
+const {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  ipcMain,
+  Notification,
 } = require('electron');
 const os = require('os');
 const path = require('path');
@@ -12,6 +14,18 @@ let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 let memoryUsage = 0;
+let memoryThreshold = 80;
+let memoryAlertActive = false;
+
+ipcMain.on('set-memory-threshold', (_event, threshold) => {
+  if (Number.isFinite(threshold) && threshold >= 1 && threshold <= 100) {
+    memoryThreshold = threshold;
+
+    if (memoryUsage < memoryThreshold) {
+      memoryAlertActive = false;
+    }
+  }
+});
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -111,6 +125,41 @@ function updateSystemUsage() {
   const currentCpuTimes = getCpuTimes();
   const totalMemory = os.totalmem();
   memoryUsage = Math.round(((totalMemory - os.freemem()) / totalMemory) * 100);
+//   if (memoryUsage >= memoryThreshold && !memoryAlertActive) {
+//   memoryAlertActive = true;
+
+//   if (Notification.isSupported()) {
+//     new Notification({
+//       title: 'High memory usage',
+//       body: `Memory usage is ${memoryUsage}%, above your ${memoryThreshold}% limit.`,
+//     }).show();
+//   }
+//   } else if (memoryUsage < memoryThreshold) {
+//    memoryAlertActive = false;
+//   }
+    if (memoryUsage >= memoryThreshold && !memoryAlertActive) {
+    memoryAlertActive = true;
+    console.log(`Threshold crossed: ${memoryUsage}% >= ${memoryThreshold}%`);
+
+    if (!Notification.isSupported()) {
+        console.error('Desktop notifications are not supported');
+    } else {
+        const notification = new Notification({
+        title: 'High memory usage',
+        body: `Memory usage is ${memoryUsage}%, above your ${memoryThreshold}% limit.`,
+        });
+
+        notification.on('show', () => console.log('Notification shown'));
+        notification.on('failed', (_event, error) =>
+        console.error('Notification failed:', error)
+        );
+
+        notification.show();
+    }
+    } else if (memoryUsage < memoryThreshold) {
+    memoryAlertActive = false;
+    }
+
   const totalDiff = currentCpuTimes.total - previousCpuTimes.total;
   const idleDiff = currentCpuTimes.idle - previousCpuTimes.idle;
 
