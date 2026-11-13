@@ -6,10 +6,12 @@ const {
 } = require('electron');
 const os = require('os');
 const path = require('path');
+const si = require('systeminformation');
 
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let memoryUsage = 0;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -94,6 +96,17 @@ function getCpuTimes() {
   return { total, idle };
 }
 
+let batteryStatus = null;
+
+async function updateBatteryStatus() {
+  try {
+    batteryStatus = await si.battery();
+    mainWindow?.webContents.send('battery-status', batteryStatus);
+  } catch (error) {
+    console.error('Could not read battery status:', error.message);
+  }
+}
+
 function updateSystemUsage() {
   const currentCpuTimes = getCpuTimes();
   const totalMemory = os.totalmem();
@@ -110,12 +123,12 @@ function updateSystemUsage() {
   mainWindow?.webContents.send('memory-usage', memoryUsage);
 }
 
-let memoryUsage = 0;
-
 app.whenReady().then(() => {
     createWindow();
     createTray();
     setInterval(updateSystemUsage, 1000);
+    updateBatteryStatus();
+    setInterval(updateBatteryStatus, 10000);
 });
 
 app.on('before-quit', () => {

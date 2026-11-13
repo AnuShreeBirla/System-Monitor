@@ -13,4 +13,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   return () => ipcRenderer.removeListener('memory-usage', listener);
   },
+  onBatteryStatus(callback) {
+  const listener = (_event, batteryStatus) => callback(batteryStatus);
+  ipcRenderer.on('battery-status', listener);
+
+  return () => ipcRenderer.removeListener('battery-status', listener);
+  },
 });

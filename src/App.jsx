@@ -7,14 +7,18 @@ function App() {
 
   const [cpuUsage, setCpuUsage] = useState(null);
   const [memoryUsage, setMemoryUsage] = useState(null);
+  const [batteryStatus, setBatteryStatus] = useState(null);
   useEffect(() => {
     const removeCpuListener = window.electronAPI.onCpuUsage(setCpuUsage);
     const removeMemoryListener =
       window.electronAPI.onMemoryUsage(setMemoryUsage);
+    const removeBatteryListener =
+    window.electronAPI.onBatteryStatus(setBatteryStatus);
 
     return () => {
       removeCpuListener();
       removeMemoryListener();
+      removeBatteryListener();
     }; 
   }, []);
 
@@ -35,7 +39,8 @@ function App() {
 
         <section className="card">
           <h2>Battery Status</h2>
-          <p>Coming next</p>
+          <p>{batteryStatus === null? 'Waiting for battery data…': batteryStatus.hasBattery? `${batteryStatus.percent}%`: 'No battery detected'}</p>
+          <p>{batteryStatus === null? '': batteryStatus.acConnected? 'Plugged in': 'Not plugged in'}</p>
         </section>
       </div>
       <section className="memory-limit">
