@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>System Monitor</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 280px;
+      height: 350px;
+      background: #1a1b22;
+      color: #f5f5f7;
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 13px;
+      overflow: hidden;
+      user-select: none;
+      -webkit-app-region: no-drag;
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid #2e2f38;
+    }
+
+    .header-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: #9298a5;
+      text-transform: uppercase;
+    }
+
+    .header-close {
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: #2e2f38;
+      cursor: pointer;
+      color: #9298a5;
+      font-size: 11px;
+      line-height: 1;
+      border: none;
+      outline: none;
+      transition: background 0.15s;
+    }
+
+    .header-close:hover {
+      background: #3e3f4a;
+      color: #f5f5f7;
+    }
+
+    /* ── Tablet preview ──────────────────────────────────── */
+    .tablet-preview {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 14px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #2e2f38;
+      transition: background 0.15s;
+      position: relative;
+    }
+
+    .tablet-preview:hover {
+      background: #22232c;
+    }
+
+    .tablet-preview:active {
+      background: #1e1f28;
+    }
+
+    /* Tablet bezel */
+    .tablet-frame {
+      position: relative;
+      width: 148px;
+      height: 100px;
+      background: #12131a;
+      border: 3px solid #3a3b46;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px #0a0b10,
+        0 4px 16px rgba(0, 0, 0, 0.6);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .tablet-preview:hover .tablet-frame {
+      transform: scale(1.03);
+      box-shadow:
+        0 0 0 1px #0a0b10,
+        0 6px 24px rgba(100, 140, 240, 0.25);
+    }
+
+    /* Fake screen content inside tablet */
+    .tablet-screen {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #0f1018 0%, #16182a 60%, #1a1c30 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .tablet-screen-label {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: #6389e8;
+      text-transform: uppercase;
+    }
+
+    .tablet-bars {
+      display: flex;
+      gap: 4px;
+      align-items: flex-end;
+      height: 28px;
+    }
+
+    .tablet-bar {
+      width: 8px;
+      border-radius: 2px 2px 0 0;
+      transition: height 0.4s ease;
+    }
+
+    .tablet-bar.cpu  { background: #6389e8; }
+    .tablet-bar.ram  { background: #4ecdc4; }
+    .tablet-bar.bat  { background: #45b26b; }
+
+    /* Home button */
+    .tablet-home {
+      position: absolute;
+      bottom: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1.5px solid #3a3b46;
+      background: #0f1018;
+    }
+
+    .launch-hint {
+      margin-top: 7px;
+      font-size: 10px;
+      color: #6389e8;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .launch-hint svg {
+      width: 10px;
+      height: 10px;
+    }
+
+    /* ── Metrics ─────────────────────────────────────────── */
+    .metrics {
+      padding: 10px 14px 0;
+    }
+
+    .metric-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 0;
+      border-bottom: 1px solid #22232c;
+    }
+
+    .metric-row:last-child {
+      border-bottom: none;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: #9298a5;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .metric-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .metric-dot.cpu  { background: #6389e8; }
+    .metric-dot.ram  { background: #4ecdc4; }
+    .metric-dot.bat  { background: #45b26b; }
+
+    .metric-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: #f5f5f7;
+      min-width: 48px;
+      text-align: right;
+    }
+
+    .metric-bar-wrap {
+      flex: 1;
+      margin: 0 10px;
+      height: 4px;
+      background: #2e2f38;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .metric-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    .metric-bar-fill.cpu  { background: #6389e8; }
+    .metric-bar-fill.ram  { background: #4ecdc4; }
+    .metric-bar-fill.bat  { background: #45b26b; }
+
+    .recent-event {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 22px;
+      padding-top: 5px;
+      font-size: 9px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .recent-event-label {
+      flex: 0 0 auto;
+      color: #9298a5;
+    }
+
+    .recent-event-value {
+      min-width: 0;
+      overflow: hidden;
+      color: #c5cad4;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px 12px;
+      border-top: 1px solid #2e2f38;
+      margin-top: 2px;
+    }
+
+    .footer-btn {
+      font-size: 11px;
+      color: #9298a5;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 4px 6px;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .footer-btn:hover {
+      color: #f5f5f7;
+      background: #2e2f38;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <span class="header-title">System Monitor</span>
+    <button class="header-close" id="closeBtn" title="Close">✕</button>
+  </div>
+
+  <!-- Tablet Preview (click to launch Unity) -->
+  <div class="tablet-preview" id="tabletPreview" title="Click to open 3D tablet dashboard">
+    <div class="tablet-frame">
+      <div class="tablet-screen">
+        <div class="tablet-screen-label">Dashboard</div>
+        <div class="tablet-bars">
+          <div class="tablet-bar cpu" id="tbCpu" style="height:0%"></div>
+          <div class="tablet-bar ram" id="tbRam" style="height:0%"></div>
+          <div class="tablet-bar bat" id="tbBat" style="height:0%"></div>
+        </div>
+      </div>
+      <div class="tablet-home"></div>
+    </div>
+    <div class="launch-hint">
+      <svg viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 1.5L7.5 5 2 8.5V1.5Z" fill="#6389e8"/>
+      </svg>
+      Click to open 3D dashboard
+    </div>
+  </div>
+
+  <!-- Live Metrics -->
+  <div class="metrics">
+    <div class="metric-row">
+      <span class="metric-label"><span class="metric-dot cpu"></span>CPU</span>
+      <div class="metric-bar-wrap"><div class="metric-bar-fill cpu" id="cpuBar" style="width:0%"></div></div>
+      <span class="metric-value" id="cpuVal">—</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label"><span class="metric-dot ram"></span>RAM</span>
+      <div class="metric-bar-wrap"><div class="metric-bar-fill ram" id="ramBar" style="width:0%"></div></div>
+      <span class="metric-value" id="ramVal">—</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label"><span class="metric-dot bat"></span>Battery</span>
+      <div class="metric-bar-wrap"><div class="metric-bar-fill bat" id="batBar" style="width:0%"></div></div>
+      <span class="metric-value" id="batVal">—</span>
+    </div>
+    <div class="recent-event" aria-live="polite">
+      <span class="recent-event-label">Latest event</span>
+      <span class="recent-event-value" id="recentEventValue">Loading…</span>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <button class="footer-btn" id="settingsBtn">⚙ Settings</button>
+    <button class="footer-btn" id="dashboardBtn">↗ Open Dashboard</button>
+  </div>
+
+  <script>
+    const api = window.electronAPI;
+
+    // ── Close button ──────────────────────────────────────
+    document.getElementById('closeBtn').addEventListener('click', () => {
+      api?.closePopover?.();
+    });
+
+    // ── Tablet preview: launch Unity ─────────────────────
+    document.getElementById('tabletPreview').addEventListener('click', () => {
+      api?.launchUnity?.();
+    });
+
+    // ── Footer buttons ────────────────────────────────────
+    document.getElementById('dashboardBtn').addEventListener('click', () => {
+      api?.launchUnity?.();
+    });
+
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+      api?.openSettings?.();
+    });
+
+    // ── Metric helpers ────────────────────────────────────
+    function setMetric(barId, valId, tbId, pct, label) {
+      const numericPct = Number(pct);
+      if (!Number.isFinite(numericPct)) return;
+      const pctClamped = Math.max(0, Math.min(100, numericPct));
+      document.getElementById(barId).style.width = `${pctClamped}%`;
+      document.getElementById(valId).textContent = label;
+      document.getElementById(tbId).style.height = `${Math.max(8, pctClamped)}%`;
+    }
+
+    function renderBattery(battery) {
+      if (battery?.hasBattery) {
+        setMetric('batBar', 'batVal', 'tbBat', battery.percent, `${battery.percent}%`);
+      } else if (battery) {
+        document.getElementById('batBar').style.width = '0%';
+        document.getElementById('batVal').textContent = 'N/A';
+        document.getElementById('tbBat').style.height = '10%';
+      }
+    }
+
+    function renderLogs(logs) {
+      const latest = Array.isArray(logs) ? logs[0] : null;
+      const eventText = latest
+        ? `${latest.eventType} · ${latest.timestamp}`
+        : 'No recent events';
+      document.getElementById('recentEventValue').textContent = eventText;
+    }
+
+    function renderSnapshot(state) {
+      if (!state) return;
+      setMetric('cpuBar', 'cpuVal', 'tbCpu', state.cpuUsage, `${state.cpuUsage}%`);
+      setMetric('ramBar', 'ramVal', 'tbRam', state.memoryUsage, `${state.memoryUsage}%`);
+      renderBattery(state.batteryStatus);
+      renderLogs(state.logs);
+    }
+
+    // ── IPC listeners ─────────────────────────────────────
+    if (api) {
+      api.onCpuUsage((cpu) => {
+        setMetric('cpuBar', 'cpuVal', 'tbCpu', cpu, `${cpu}%`);
+      });
+
+      api.onMemoryUsage((ram) => {
+        setMetric('ramBar', 'ramVal', 'tbRam', ram, `${ram}%`);
+      });
+
+      api.onBatteryStatus((bat) => {
+        renderBattery(bat);
+      });
+
+      api.onSystemLogs(renderLogs);
+      api.getSystemMonitorState()
+        .then(renderSnapshot)
+        .catch((error) => {
+          document.getElementById('recentEventValue').textContent = 'Live metrics unavailable';
+          console.error('Could not load initial System Monitor state:', error);
+        });
+    }
+  </script>
+</body>
+</html>
