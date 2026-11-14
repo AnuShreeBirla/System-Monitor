@@ -256,3 +256,9 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
     isQuitting = true;
 });
+
+app.on('activate', () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+        mainWindow.show();
+    }
+});
