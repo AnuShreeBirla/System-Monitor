@@ -9,7 +9,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "electron ."
+    "start": "electron .",
+    "sign:dev": "codesign --force --deep --sign \"Electron Dev\" node_modules/electron/dist/Electron.app",
+    "i:electron": "node node_modules/electron/install.js"
   },
   "dependencies": {
     "react": "^19.3.1",
