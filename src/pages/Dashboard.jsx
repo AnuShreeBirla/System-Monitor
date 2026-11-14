@@ -6,30 +6,63 @@ function Dashboard() {
   const [cpuUsage, setCpuUsage] = useState(null);
   const [memoryUsage, setMemoryUsage] = useState(null);
   const [batteryStatus, setBatteryStatus] = useState(null);
-  const [logs,setLogs] = useState([])
+  const [logs, setLogs] = useState([]);
 
   useEffect(() => {
-    const removePowerListener =
-        window.electronAPI.onPowerEvent((log) => {
-            setLogs((previousLogs) => [log, ...previousLogs]);
-        });
+    const electronAPI = window.electronAPI;
+    const removeCpuListener = electronAPI?.onCpuUsage(setCpuUsage);
+    const removeMemoryListener = electronAPI?.onMemoryUsage(setMemoryUsage);
+    const removeBatteryListener = electronAPI?.onBatteryStatus(setBatteryStatus);
 
-    return () => {
-        removePowerListener();
+    // Unity's UWB CEF browser has no Electron preload, so it relies entirely
+    // on this HTTP poll.  The API server always runs on 127.0.0.1:5175 inside
+    // the Electron process, independent of whether the Vite dev server is up.
+    // Using an absolute URL avoids both the localhost/127.0.0.1 name mismatch
+    // and any relative-URL resolution surprises inside CEF.
+    const API_URL = 'http://127.0.0.1:5175/api/system-monitor';
+
+    let cancelled = false;
+    let consecutiveFailures = 0;
+
+    const pollMetrics = async () => {
+      try {
+        const response = await fetch(API_URL, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const metrics = await response.json();
+        if (cancelled) return;
+
+        consecutiveFailures = 0;
+
+        // Electron IPC stays the primary source in the desktop app. Unity's
+        // separate CEF process has no preload, so it uses this HTTP feed.
+        if (!electronAPI) {
+          setCpuUsage(metrics.cpuUsage);
+          setMemoryUsage(metrics.memoryUsage);
+          setBatteryStatus(metrics.batteryStatus);
+        }
+        setLogs(metrics.logs ?? []);
+      } catch (error) {
+        if (cancelled) return;
+        consecutiveFailures += 1;
+        // Log the first failure, then only every 10th to avoid console spam
+        if (consecutiveFailures === 1 || consecutiveFailures % 10 === 0) {
+          console.warn(
+            `System Monitor polling unavailable (attempt ${consecutiveFailures}):`,
+            error.message,
+          );
+        }
+      }
     };
-  }, []);
 
-  useEffect(() => {
-    const removeCpuListener = window.electronAPI.onCpuUsage(setCpuUsage);
-    const removeMemoryListener =
-      window.electronAPI.onMemoryUsage(setMemoryUsage);
-    const removeBatteryListener =
-      window.electronAPI.onBatteryStatus(setBatteryStatus);
+    pollMetrics();
+    const pollTimer = window.setInterval(pollMetrics, 2000);
 
     return () => {
-      removeCpuListener();
-      removeMemoryListener();
-      removeBatteryListener();
+      cancelled = true;
+      window.clearInterval(pollTimer);
+      removeCpuListener?.();
+      removeMemoryListener?.();
+      removeBatteryListener?.();
     };
   }, []);
 

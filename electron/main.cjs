@@ -7,7 +7,6 @@ const {
   dialog,
   ipcMain,
   Notification,
-  powerMonitor,
   screen,
 } = require('electron');
 const { spawn } = require('child_process');
