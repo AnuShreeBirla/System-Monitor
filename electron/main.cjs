@@ -46,7 +46,7 @@ function createWindow(options = {}) {
     });
     
 
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5173/#/');
 
     // Hide instead of closing
     mainWindow.on('close', (event) => {
@@ -138,7 +138,7 @@ function createSettingsWindow() {
     });
 
     // Development
-    settingsWindow.loadURL('http://localhost:5173/settings');
+    settingsWindow.loadURL('http://localhost:5173/#/settings');
 
     settingsWindow.once('ready-to-show', () => {
         settingsWindow.show();
