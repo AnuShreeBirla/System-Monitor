@@ -1,13 +1,23 @@
 
-import './App.css';
+import './Dashboard.css';
 import { useEffect, useState } from 'react';
 
 function Dashboard() {
-  const logs = [];
-
   const [cpuUsage, setCpuUsage] = useState(null);
   const [memoryUsage, setMemoryUsage] = useState(null);
   const [batteryStatus, setBatteryStatus] = useState(null);
+  const [logs,setLogs] = useState([])
+
+  useEffect(() => {
+    const removePowerListener =
+        window.electronAPI.onPowerEvent((log) => {
+            setLogs((previousLogs) => [log, ...previousLogs]);
+        });
+
+    return () => {
+        removePowerListener();
+    };
+  }, []);
 
   useEffect(() => {
     const removeCpuListener = window.electronAPI.onCpuUsage(setCpuUsage);
@@ -78,7 +88,7 @@ function Dashboard() {
           </thead>
           <tbody>
             {logs.length ? (
-              logs.slice(0, 5).map((log) => (
+              logs.map((log) => (
                 <tr key={log.id}>
                   <td>{log.id}</td>
                   <td>{log.eventType}</td>

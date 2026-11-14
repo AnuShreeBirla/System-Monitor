@@ -22,4 +22,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setMemoryThreshold(threshold) {
   ipcRenderer.send('set-memory-threshold', threshold);
   },
+  onPowerEvent: (callback) => {
+    const listener = (_event, log) => callback(log);
+
+    ipcRenderer.on('power-event', listener);
+
+    return () => {
+        ipcRenderer.removeListener('power-event', listener);
+    };
+},
 });

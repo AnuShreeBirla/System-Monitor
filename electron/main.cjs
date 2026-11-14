@@ -6,6 +6,7 @@ const {
   Menu,
   ipcMain,
   Notification,
+  powerMonitor
 } = require('electron');
 const os = require('os');
 const path = require('path');
@@ -103,6 +104,36 @@ function createTray() {
 
     tray.on('click', () => {
         mainWindow.show();
+    });
+}
+
+function setupPowerEvents() {
+    const events = {
+        'suspend': 'System Sleep',
+        'resume': 'System Wake',
+        'lock-screen': 'Screen Locked',
+        'unlock-screen': 'Screen Unlocked',
+        'on-ac': 'Connected to AC Power',
+        'on-battery': 'Switched to Battery'
+    };
+
+    Object.entries(events).forEach(([eventName, description]) => {
+        powerMonitor.on(eventName, () => {
+            const log = {
+                id: Date.now(),
+                eventType: description,
+                timestamp: new Date().toLocaleString()
+            };
+
+            console.log('Power Event:', log);
+
+            // Send event to renderer windows
+            BrowserWindow.getAllWindows().forEach((win) => {
+                if (!win.isDestroyed()) {
+                    win.webContents.send('power-event', log);
+                }
+            });
+        });
     });
 }
 
@@ -247,7 +278,8 @@ app.whenReady().then(() => {
     const startHidden = configureStartup(openWhenLogedIn);
     createWindow({show: !startHidden});
     createTray();
-
+    
+    setupPowerEvents();
     setInterval(updateSystemUsage, 1000);
     updateBatteryStatus();
     setInterval(updateBatteryStatus, 10000);
