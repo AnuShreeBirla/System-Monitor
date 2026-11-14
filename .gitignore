@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Unity generated files
+My project/Library/
+My project/Temp/
+My project/Logs/
+My project/Obj/
+My project/UserSettings/
+My project/Builds/
