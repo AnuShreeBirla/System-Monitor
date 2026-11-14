@@ -1,0 +1,55 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:Style src="StatusPanel.uss" />
+    <ui:VisualElement name="status-panel-container" class="status-panel-container">
+        <ui:VisualElement name="panel-header" class="panel-header">
+            <ui:Label name="title-label" text="SYSTEM MONITOR" class="panel-title" />
+            <ui:VisualElement name="status-badge" class="status-badge status-badge-normal">
+                <ui:Label name="status-badge-text" text="SYSTEM OK" class="status-badge-text badge-text-normal" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="cpu-section" class="metric-section">
+            <ui:VisualElement class="metric-header">
+                <ui:Label text="CPU Usage" class="metric-label" />
+                <ui:Label name="cpu-value" text="42%" class="metric-value" />
+            </ui:VisualElement>
+            <ui:VisualElement class="bar-bg">
+                <ui:VisualElement name="cpu-bar-fill" class="bar-fill" style="width: 42%;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="ram-section" class="metric-section">
+            <ui:VisualElement class="metric-header">
+                <ui:Label text="RAM Usage" class="metric-label" />
+                <ui:Label name="ram-value" text="58%" class="metric-value" />
+            </ui:VisualElement>
+            <ui:VisualElement class="bar-bg">
+                <ui:VisualElement name="ram-bar-fill" class="bar-fill" style="width: 58%;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="battery-section" class="metric-section">
+            <ui:VisualElement class="metric-header">
+                <ui:Label text="Battery Level" class="metric-label" />
+                <ui:Label name="battery-value" text="85%" class="metric-value" />
+            </ui:VisualElement>
+            <ui:VisualElement class="bar-bg">
+                <ui:VisualElement name="battery-bar-fill" class="bar-fill" style="width: 85%;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="warning-box" class="warning-container warning-container-normal">
+            <ui:Label name="warning-text" text="Status: All systems nominal." class="warning-text warning-text-normal" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="test-controls" class="test-controls-section">
+            <ui:Label text="TEST CONTROLS (Keys 1-4 or Click)" class="test-title" />
+            <ui:VisualElement class="button-row">
+                <ui:Button name="btn-normal" text="Normal" class="sim-button" />
+                <ui:Button name="btn-cpu" text="High CPU" class="sim-button" />
+                <ui:Button name="btn-ram" text="High RAM" class="sim-button" />
+                <ui:Button name="btn-battery" text="Low Bat" class="sim-button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
