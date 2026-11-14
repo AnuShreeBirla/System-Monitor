@@ -1,8 +1,8 @@
+
 import './App.css';
 import { useEffect, useState } from 'react';
 
 function Dashboard() {
-  const [memoryLimit, setMemoryLimit] = useState(80);
   const logs = [];
 
   const [cpuUsage, setCpuUsage] = useState(null);
@@ -64,26 +64,6 @@ function Dashboard() {
           </p>
         </section>
       </div>
-
-      <section className="memory-limit">
-        <label htmlFor="memory-limit">Memory limit</label>
-        <input
-          id="memory-limit"
-          type="number"
-          min="1"
-          max="100"
-          value={memoryLimit}
-          onChange={(event) => {
-            const threshold = Number(event.target.value);
-
-            if (threshold >= 1 && threshold <= 100) {
-              setMemoryLimit(threshold);
-              window.electronAPI.setMemoryThreshold(threshold);
-            }
-          }}
-        />
-        <span>%</span>
-      </section>
 
       <section className="logs">
         <h2>Logs</h2>

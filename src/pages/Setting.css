@@ -157,3 +157,52 @@
     padding: 18px 10px;
   }
 }
+
+/* Consistent alignment for all setting rows */
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 23px 20px;
+  gap: 20px;
+  border-top: 1px solid #34353d;
+  text-align: left;
+}
+
+.setting-item > div {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.setting-item h3 {
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  line-height: 1.5;
+}
+
+.setting-item p {
+  margin: 10px 0 0;
+  padding: 0;
+  text-align: left;
+  line-height: 1.5;
+}
+
+/* Keep memory slider aligned with setting rows */
+.threshold-control {
+  padding: 12px 20px 25px;
+  margin: 0;
+}
+
+.threshold-control input {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+/* Keep controls aligned on the right */
+.setting-item > input,
+.setting-item > select {
+  flex-shrink: 0;
+}
