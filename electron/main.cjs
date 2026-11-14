@@ -17,6 +17,7 @@ const openWhenLogedIn = true;
 // Variables
 let mainWindow = null;
 let tray = null;
+let settingsWindow = null;
 let isQuitting = false;
 let memoryUsage = 0;
 let memoryThreshold = 80;
@@ -83,6 +84,10 @@ function createTray() {
             }
         },
         {
+            label: 'Open Settings',
+            click: () => createSettingsWindow()
+        },
+        {
             type: 'separator'
         },
         {
@@ -99,6 +104,50 @@ function createTray() {
     tray.on('click', () => {
         mainWindow.show();
     });
+}
+
+function createSettingsWindow() {
+
+    // If Settings is already open, reuse it
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+
+        if (settingsWindow.isMinimized()) {
+            settingsWindow.restore();
+        }
+
+        settingsWindow.show();
+        settingsWindow.focus();
+
+        return;
+    }
+
+    settingsWindow = new BrowserWindow({
+
+        width: 600,
+        height: 500,
+
+        resizable: true,
+        show: false,
+
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false
+        }
+
+    });
+
+    // Development
+    settingsWindow.loadURL('http://localhost:5173/settings');
+
+    settingsWindow.once('ready-to-show', () => {
+        settingsWindow.show();
+    });
+
+    settingsWindow.on('closed', () => {
+        settingsWindow = null;
+    });
+
 }
 
 function configureStartup(open) {
