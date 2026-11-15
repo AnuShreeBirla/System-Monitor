@@ -1,5 +1,7 @@
+// settings
+
 import "./Setting.css";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 
 function Settings() {
     const [settings, setSettings] = useState({
@@ -13,47 +15,31 @@ function Settings() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
 
-    // Load settings from the main process
+    // Load saved settings when the component opens
     useEffect(() => {
-        let cancelled = false;
-
         async function loadSavedSettings() {
             try {
-                const savedSettings =
-                    await window.electronAPI.getSettings();
-
-                if (!cancelled) {
-                    setSettings(savedSettings);
-                }
+                const savedSettings = await window.electronAPI.getSettings();
+                setSettings(savedSettings);
             } catch (error) {
                 console.error("Failed to load settings:", error);
-
-                if (!cancelled) {
-                    setError("Could not load saved settings.");
-                }
+                setError("Could not load saved settings.");
             } finally {
-                if (!cancelled) {
-                    setIsLoading(false);
-                }
+                setIsLoading(false);
             }
         }
 
         loadSavedSettings();
-
-        return () => {
-            cancelled = true;
-        };
     }, []);
 
-    // Update settings through the main process
+    // Update and save settings through Electron
     const handleChange = async (key, value) => {
         try {
             setError("");
 
-            const result =
-                await window.electronAPI.updateSettings({
-                    [key]: value,
-                });
+            const result = await window.electronAPI.updateSettings({
+                [key]: value,
+            });
 
             if (!result.ok) {
                 setError(result.errors.join(", "));
@@ -80,16 +66,11 @@ function Settings() {
                 <p>Manage your system monitoring preferences.</p>
             </header>
 
-            {error && (
-                <p className="error-message" role="alert">
-                    {error}
-                </p>
-            )}
+            {error && <p className="error-message">{error}</p>}
 
             {/* Monitoring */}
             <section className="settings-section">
                 <h2>Monitoring</h2>
-
                 <p className="section-description">
                     Control how your system resources are monitored.
                 </p>
@@ -104,10 +85,7 @@ function Settings() {
                         type="checkbox"
                         checked={settings.monitoringEnabled}
                         onChange={(e) =>
-                            handleChange(
-                                "monitoringEnabled",
-                                e.target.checked
-                            )
+                            handleChange("monitoringEnabled", e.target.checked)
                         }
                     />
                 </div>
@@ -121,10 +99,7 @@ function Settings() {
                     <select
                         value={settings.refreshInterval}
                         onChange={(e) =>
-                            handleChange(
-                                "refreshInterval",
-                                Number(e.target.value)
-                            )
+                            handleChange("refreshInterval", Number(e.target.value))
                         }
                     >
                         <option value={500}>500 ms</option>
@@ -138,7 +113,6 @@ function Settings() {
             {/* Alerts and Notifications */}
             <section className="settings-section">
                 <h2>Alerts & Notifications</h2>
-
                 <p className="section-description">
                     Configure memory warnings and notifications.
                 </p>
@@ -146,9 +120,7 @@ function Settings() {
                 <div className="setting-item">
                     <div>
                         <h3>Memory Threshold</h3>
-                        <p>
-                            Get notified when RAM usage reaches this limit.
-                        </p>
+                        <p>Get notified when RAM usage reaches this limit.</p>
                     </div>
 
                     <strong>{settings.memoryThreshold}%</strong>
@@ -162,10 +134,7 @@ function Settings() {
                         step="5"
                         value={settings.memoryThreshold}
                         onChange={(e) =>
-                            handleChange(
-                                "memoryThreshold",
-                                Number(e.target.value)
-                            )
+                            handleChange("memoryThreshold", Number(e.target.value))
                         }
                     />
 
@@ -185,10 +154,7 @@ function Settings() {
                         type="checkbox"
                         checked={settings.notificationsEnabled}
                         onChange={(e) =>
-                            handleChange(
-                                "notificationsEnabled",
-                                e.target.checked
-                            )
+                            handleChange("notificationsEnabled", e.target.checked)
                         }
                     />
                 </div>
@@ -197,7 +163,6 @@ function Settings() {
             {/* Startup */}
             <section className="settings-section">
                 <h2>Startup</h2>
-
                 <p className="section-description">
                     Configure application startup preferences.
                 </p>
@@ -214,10 +179,7 @@ function Settings() {
                         type="checkbox"
                         checked={settings.openAtLogin}
                         onChange={(e) =>
-                            handleChange(
-                                "openAtLogin",
-                                e.target.checked
-                            )
+                            handleChange("openAtLogin", e.target.checked)
                         }
                     />
                 </div>
