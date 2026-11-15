@@ -1,149 +1,229 @@
-
 import "./Setting.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function Settings() {
-  const [settings, setSettings] = useState({
-    memoryThreshold: 80,
-    monitoringEnabled: true,
-    refreshInterval: 1000,
-    openAtLogin: true,
-    notificationsEnabled: true,
-  });
+    const [settings, setSettings] = useState({
+        memoryThreshold: 80,
+        monitoringEnabled: true,
+        refreshInterval: 1000,
+        openAtLogin: true,
+        notificationsEnabled: true,
+    });
 
-  const handleChange = (key, value) => {
-    setSettings((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState("");
 
-  return (
-    <main className="settings-page">
-      <header className="settings-header">
-        <p className="settings-label">SYSTEM MONITOR</p>
-        <h1>Settings</h1>
-        <p>Manage your system monitoring preferences.</p>
-      </header>
+    // Load settings from the main process
+    useEffect(() => {
+        let cancelled = false;
 
-      {/* Monitoring */}
-      <section className="settings-section">
-        <h2>Monitoring</h2>
-        <p className="section-description">
-          Control how your system resources are monitored.
-        </p>
+        async function loadSavedSettings() {
+            try {
+                const savedSettings =
+                    await window.electronAPI.getSettings();
 
-        <div className="setting-item">
-          <div>
-            <h3>Enable Monitoring</h3>
-            <p>Start or pause system resource monitoring.</p>
-          </div>
+                if (!cancelled) {
+                    setSettings(savedSettings);
+                }
+            } catch (error) {
+                console.error("Failed to load settings:", error);
 
-          <input
-            type="checkbox"
-            checked={settings.monitoringEnabled}
-            onChange={(e) =>
-              handleChange("monitoringEnabled", e.target.checked)
+                if (!cancelled) {
+                    setError("Could not load saved settings.");
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
             }
-          />
-        </div>
+        }
 
-        <div className="setting-item">
-          <div>
-            <h3>Refresh Interval</h3>
-            <p>Choose how frequently system data is refreshed.</p>
-          </div>
+        loadSavedSettings();
 
-          <select
-            value={settings.refreshInterval}
-            onChange={(e) =>
-              handleChange("refreshInterval", Number(e.target.value))
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    // Update settings through the main process
+    const handleChange = async (key, value) => {
+        try {
+            setError("");
+
+            const result =
+                await window.electronAPI.updateSettings({
+                    [key]: value,
+                });
+
+            if (!result.ok) {
+                setError(result.errors.join(", "));
+                return;
             }
-          >
-            <option value={500}>500 ms</option>
-            <option value={1000}>1 second</option>
-            <option value={2000}>2 seconds</option>
-            <option value={5000}>5 seconds</option>
-          </select>
-        </div>
-      </section>
 
-      {/* Alerts and Notifications */}
-      <section className="settings-section">
-        <h2>Alerts & Notifications</h2>
-        <p className="section-description">
-          Configure memory warnings and notifications.
-        </p>
+            setSettings(result.settings);
 
-        <div className="setting-item">
-          <div>
-            <h3>Memory Threshold</h3>
-            <p>Get notified when RAM usage reaches this limit.</p>
-          </div>
+        } catch (error) {
+            console.error("Failed to update settings:", error);
+            setError("Could not save settings.");
+        }
+    };
 
-          <strong>{settings.memoryThreshold}%</strong>
-        </div>
+    if (isLoading) {
+        return <p>Loading settings...</p>;
+    }
 
-        <div className="threshold-control">
-          <input
-            type="range"
-            min="50"
-            max="100"
-            step="5"
-            value={settings.memoryThreshold}
-            onChange={(e) =>
-              handleChange("memoryThreshold", Number(e.target.value))
-            }
-          />
+    return (
+        <main className="settings-page">
+            <header className="settings-header">
+                <p className="settings-label">SYSTEM MONITOR</p>
+                <h1>Settings</h1>
+                <p>Manage your system monitoring preferences.</p>
+            </header>
 
-          <div className="range-labels">
-            <span>50%</span>
-            <span>100%</span>
-          </div>
-        </div>
+            {error && (
+                <p className="error-message" role="alert">
+                    {error}
+                </p>
+            )}
 
-        <div className="setting-item">
-          <div>
-            <h3>Desktop Notifications</h3>
-            <p>Receive alerts about system activity.</p>
-          </div>
+            {/* Monitoring */}
+            <section className="settings-section">
+                <h2>Monitoring</h2>
 
-          <input
-            type="checkbox"
-            checked={settings.notificationsEnabled}
-            onChange={(e) =>
-              handleChange("notificationsEnabled", e.target.checked)
-            }
-          />
-        </div>
-      </section>
+                <p className="section-description">
+                    Control how your system resources are monitored.
+                </p>
 
-      {/* Startup */}
-      <section className="settings-section">
-        <h2>Startup</h2>
-        <p className="section-description">
-          Configure application startup preferences.
-        </p>
+                <div className="setting-item">
+                    <div>
+                        <h3>Enable Monitoring</h3>
+                        <p>Start or pause system resource monitoring.</p>
+                    </div>
 
-        <div className="setting-item">
-          <div>
-            <h3>Launch at Login</h3>
-            <p>
-              Automatically start System Monitor when you log in.
-            </p>
-          </div>
+                    <input
+                        type="checkbox"
+                        checked={settings.monitoringEnabled}
+                        onChange={(e) =>
+                            handleChange(
+                                "monitoringEnabled",
+                                e.target.checked
+                            )
+                        }
+                    />
+                </div>
 
-          <input
-            type="checkbox"
-            checked={settings.openAtLogin}
-            onChange={(e) =>
-              handleChange("openAtLogin", e.target.checked)
-            }
-          />
-        </div>
-      </section>
-    </main>
-  );
+                <div className="setting-item">
+                    <div>
+                        <h3>Refresh Interval</h3>
+                        <p>Choose how frequently system data is refreshed.</p>
+                    </div>
+
+                    <select
+                        value={settings.refreshInterval}
+                        onChange={(e) =>
+                            handleChange(
+                                "refreshInterval",
+                                Number(e.target.value)
+                            )
+                        }
+                    >
+                        <option value={500}>500 ms</option>
+                        <option value={1000}>1 second</option>
+                        <option value={2000}>2 seconds</option>
+                        <option value={5000}>5 seconds</option>
+                    </select>
+                </div>
+            </section>
+
+            {/* Alerts and Notifications */}
+            <section className="settings-section">
+                <h2>Alerts & Notifications</h2>
+
+                <p className="section-description">
+                    Configure memory warnings and notifications.
+                </p>
+
+                <div className="setting-item">
+                    <div>
+                        <h3>Memory Threshold</h3>
+                        <p>
+                            Get notified when RAM usage reaches this limit.
+                        </p>
+                    </div>
+
+                    <strong>{settings.memoryThreshold}%</strong>
+                </div>
+
+                <div className="threshold-control">
+                    <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        step="5"
+                        value={settings.memoryThreshold}
+                        onChange={(e) =>
+                            handleChange(
+                                "memoryThreshold",
+                                Number(e.target.value)
+                            )
+                        }
+                    />
+
+                    <div className="range-labels">
+                        <span>50%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+
+                <div className="setting-item">
+                    <div>
+                        <h3>Desktop Notifications</h3>
+                        <p>Receive alerts about system activity.</p>
+                    </div>
+
+                    <input
+                        type="checkbox"
+                        checked={settings.notificationsEnabled}
+                        onChange={(e) =>
+                            handleChange(
+                                "notificationsEnabled",
+                                e.target.checked
+                            )
+                        }
+                    />
+                </div>
+            </section>
+
+            {/* Startup */}
+            <section className="settings-section">
+                <h2>Startup</h2>
+
+                <p className="section-description">
+                    Configure application startup preferences.
+                </p>
+
+                <div className="setting-item">
+                    <div>
+                        <h3>Launch at Login</h3>
+                        <p>
+                            Automatically start System Monitor when you log in.
+                        </p>
+                    </div>
+
+                    <input
+                        type="checkbox"
+                        checked={settings.openAtLogin}
+                        onChange={(e) =>
+                            handleChange(
+                                "openAtLogin",
+                                e.target.checked
+                            )
+                        }
+                    />
+                </div>
+            </section>
+        </main>
+    );
 }
 
 export default Settings;

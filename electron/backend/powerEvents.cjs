@@ -1,7 +1,7 @@
 
-const fs = require("fs/promises");
-const path = require("path");
-const crypto = require("crypto");
+const fs = require('fs/promises');
+const path = require('path');
+const crypto = require('crypto');
 
 const VALID_TYPES = [
   "sleep",
@@ -9,148 +9,204 @@ const VALID_TYPES = [
   "lock",
   "unlock",
   "on-battery",
+  "on-ac",
 ];
 
 const MAX_EVENTS = 20;
 
-// Read database, or create it if it doesn't exist
-async function readDatabase(dbPath) {
-  try {
-    const content = await fs.readFile(dbPath, "utf8");
-    const data = JSON.parse(content);
+// Prevent overlapping database operations.
+let databaseQueue = Promise.resolve();
 
-    if (!data || typeof data !== "object" || Array.isArray(data)) {
-      throw new Error("Invalid database format");
-    }
+function withDatabaseLock(operation) {
+    const task = databaseQueue.then(operation, operation);
 
-    if (!Array.isArray(data.powerEvents)) {
-      data.powerEvents = [];
-    }
+    databaseQueue = task.catch(() => {});
 
-    return data;
-  } catch (error) {
-    if (error.code !== "ENOENT") {
-      throw error;
-    }
-
-    const initialData = { powerEvents: [] };
-
-    await fs.mkdir(path.dirname(dbPath), { recursive: true });
-    await fs.writeFile(
-      dbPath,
-      JSON.stringify(initialData, null, 2),
-      "utf8"
-    );
-
-    return initialData;
-  }
+    return task;
 }
 
-// Save database
+// READ DATABASE
+async function readDatabase(dbPath) {
+    try {
+        const content = await fs.readFile(dbPath, 'utf8');
+        const data = JSON.parse(content);
+
+        if (
+            !data ||
+            typeof data !== 'object' ||
+            Array.isArray(data) ||
+            !Array.isArray(data.powerEvents)
+        ) {
+            throw new Error('Invalid power events database format');
+        }
+
+        return data;
+
+    } catch (error) {
+        if (error.code !== 'ENOENT') {
+            throw error;
+        }
+
+        const initialData = { powerEvents: [] };
+
+        await fs.mkdir(path.dirname(dbPath), {
+            recursive: true,
+        });
+
+        await saveDatabase(dbPath, initialData);
+
+        return initialData;
+    }
+}
+
+// SAVE DATABASE
 async function saveDatabase(dbPath, data) {
-  await fs.mkdir(path.dirname(dbPath), { recursive: true });
+    await fs.mkdir(path.dirname(dbPath), {
+        recursive: true,
+    });
 
-  const tempPath = `${dbPath}.tmp`;
+    const temporaryPath =
+        `${dbPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
 
-  await fs.writeFile(
-    tempPath,
-    JSON.stringify(data, null, 2),
-    "utf8"
-  );
+    try {
+        await fs.writeFile(
+            temporaryPath,
+            JSON.stringify(data, null, 2),
+            'utf8'
+        );
 
-  await fs.rename(tempPath, dbPath);
+        await fs.rename(temporaryPath, dbPath);
+
+    } catch (error) {
+        try {
+            await fs.unlink(temporaryPath);
+        } catch {}
+
+        throw error;
+    }
 }
 
 // CREATE
 async function addPowerEvent(dbPath, type, description) {
-  if (!VALID_TYPES.includes(type)) {
-    throw new Error("Invalid power event type");
-  }
+    return withDatabaseLock(async () => {
+        if (!VALID_TYPES.includes(type)) {
+            throw new Error('Invalid power event type');
+        }
 
-  if (typeof description !== "string" || !description.trim()) {
-    throw new Error("Description is required");
-  }
+        if (
+            typeof description !== 'string' ||
+            !description.trim()
+        ) {
+            throw new Error('Description is required');
+        }
 
-  const data = await readDatabase(dbPath);
+        const data = await readDatabase(dbPath);
 
-  const newEvent = {
-    id: `evt_${crypto.randomUUID()}`,
-    type,
-    timestamp: new Date().toISOString(),
-    description: description.trim(),
-  };
+        const newEvent = {
+            id: `evt_${crypto.randomUUID()}`,
+            type,
+            timestamp: new Date().toISOString(),
+            description: description.trim(),
+        };
 
-  data.powerEvents.push(newEvent);
+        data.powerEvents.push(newEvent);
 
-  // Keep only the latest 20 events
-  data.powerEvents = data.powerEvents.slice(-MAX_EVENTS);
+        data.powerEvents =
+            data.powerEvents.slice(-MAX_EVENTS);
 
-  await saveDatabase(dbPath, data);
+        await saveDatabase(dbPath, data);
 
-  return newEvent;
+        return newEvent;
+    });
 }
 
 // READ
 async function getPowerEvents(dbPath) {
-  const data = await readDatabase(dbPath);
+    return withDatabaseLock(async () => {
+        const data = await readDatabase(dbPath);
 
-  return [...data.powerEvents].reverse();
+        return [...data.powerEvents].reverse();
+    });
 }
 
 // UPDATE
 async function updatePowerEvent(dbPath, id, updates) {
-  const data = await readDatabase(dbPath);
+    return withDatabaseLock(async () => {
+        if (
+            !updates ||
+            typeof updates !== 'object' ||
+            Array.isArray(updates)
+        ) {
+            throw new Error('Updates must be an object');
+        }
 
-  const event = data.powerEvents.find(item => item.id === id);
+        const allowedKeys = ['type', 'description'];
 
-  if (!event) {
-    throw new Error("Power event not found");
-  }
+        for (const key of Object.keys(updates)) {
+            if (!allowedKeys.includes(key)) {
+                throw new Error(`Unknown update field: ${key}`);
+            }
+        }
 
-  if (updates.type !== undefined) {
-    if (!VALID_TYPES.includes(updates.type)) {
-      throw new Error("Invalid power event type");
-    }
-    event.type = updates.type;
-  }
+        const data = await readDatabase(dbPath);
 
-  if (updates.description !== undefined) {
-    if (
-      typeof updates.description !== "string" ||
-      !updates.description.trim()
-    ) {
-      throw new Error("Invalid description");
-    }
-    event.description = updates.description.trim();
-  }
+        const event = data.powerEvents.find(
+            item => item.id === id
+        );
 
-  await saveDatabase(dbPath, data);
+        if (!event) {
+            throw new Error('Power event not found');
+        }
 
-  return event;
+        if (updates.type !== undefined) {
+            if (!VALID_TYPES.includes(updates.type)) {
+                throw new Error('Invalid power event type');
+            }
+
+            event.type = updates.type;
+        }
+
+        if (updates.description !== undefined) {
+            if (
+                typeof updates.description !== 'string' ||
+                !updates.description.trim()
+            ) {
+                throw new Error('Invalid description');
+            }
+
+            event.description = updates.description.trim();
+        }
+
+        await saveDatabase(dbPath, data);
+
+        return event;
+    });
 }
 
 // DELETE
 async function deletePowerEvent(dbPath, id) {
-  const data = await readDatabase(dbPath);
+    return withDatabaseLock(async () => {
+        const data = await readDatabase(dbPath);
 
-  const originalLength = data.powerEvents.length;
+        const originalLength = data.powerEvents.length;
 
-  data.powerEvents = data.powerEvents.filter(
-    event => event.id !== id
-  );
+        data.powerEvents = data.powerEvents.filter(
+            event => event.id !== id
+        );
 
-  if (data.powerEvents.length === originalLength) {
-    throw new Error("Power event not found");
-  }
+        if (data.powerEvents.length === originalLength) {
+            throw new Error('Power event not found');
+        }
 
-  await saveDatabase(dbPath, data);
+        await saveDatabase(dbPath, data);
 
-  return true;
+        return true;
+    });
 }
 
 module.exports = {
-  addPowerEvent,
-  getPowerEvents,
-  updatePowerEvent,
-  deletePowerEvent,
+    addPowerEvent,
+    getPowerEvents,
+    updatePowerEvent,
+    deletePowerEvent,
 };

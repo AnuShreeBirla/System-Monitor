@@ -8,7 +8,21 @@ const {
   ipcMain,
   Notification,
   screen,
+  powerMonitor
 } = require('electron');
+const {
+    cloneDefaults,
+    updateSettings,
+    loadSettings,
+    saveSettings,
+} = require('./backend/settings.cjs');
+
+const {
+    addPowerEvent,
+    getPowerEvents,
+    updatePowerEvent,
+    deletePowerEvent,
+} = require('./backend/powerEvents.cjs');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const { existsSync } = fs;
@@ -18,7 +32,6 @@ const path = require('path');
 const si = require('systeminformation');
 
 // Constants
-const openWhenLogedIn = true;
 const unityAppPath = process.env.SYSTEM_MONITOR_UNITY_APP_PATH || path.resolve(
   __dirname,
   '..',
@@ -35,8 +48,14 @@ let tray = null;
 let settingsWindow = null;
 let popoverWindow = null;
 let memoryUsage = 0;
-let memoryThreshold = 80;
 let memoryAlertActive = false;
+let settings = cloneDefaults();
+
+let settingsFilePath = null;
+let powerEventsFilePath = null;
+
+let monitoringTimer = null;
+let batteryTimer = null;
 
 // ─── Threshold-event log (shared by HTTP API) ─────────────────────────────────
 
@@ -61,12 +80,13 @@ function recordApiThresholdEvent(key, active, eventType) {
 // ─── IPC handlers ────────────────────────────────────────────────────────────
 
 ipcMain.on('set-memory-threshold', (_event, threshold) => {
-  if (Number.isFinite(threshold) && threshold >= 1 && threshold <= 100) {
-    memoryThreshold = threshold;
-    if (memoryUsage < memoryThreshold) {
-      memoryAlertActive = false;
+    const result = applySettingsPatch({
+        memoryThreshold: threshold,
+    });
+
+    if (!result.ok) {
+        console.error('Could not update memory threshold:', result.errors);
     }
-  }
 });
 
 ipcMain.on('launch-unity', () => {
@@ -217,10 +237,16 @@ function createTray() {
         {
             label: 'Pause Monitoring',
             type: 'checkbox',
-            checked: false,
+            checked: settings.monitoringEnabled,
             click: (item) => {
-                console.log('Monitoring paused:', item.checked);
-            }
+    const result = applySettingsPatch({
+        monitoringEnabled: item.checked,
+    });
+
+    if (!result.ok) {
+        console.error('Could not change monitoring state:', result.errors);
+    }
+},
         },
         {
             label: 'Open Settings',
@@ -355,72 +381,113 @@ function broadcastToAllWindows(channel, payload) {
 }
 
 function updateSystemUsage() {
-  const currentCpuTimes = getCpuTimes();
-  const totalMemory = os.totalmem();
-  memoryUsage = Math.round(((totalMemory - os.freemem()) / totalMemory) * 100);
+    const currentCpuTimes = getCpuTimes();
 
-  if (memoryUsage >= memoryThreshold && !memoryAlertActive) {
-    memoryAlertActive = true;
-    console.log(`Threshold crossed: ${memoryUsage}% >= ${memoryThreshold}%`);
+    const totalMemory = os.totalmem();
 
-    if (!Notification.isSupported()) {
-      console.error('Desktop notifications are not supported');
-    } else {
-      const notification = new Notification({
-        title: 'High memory usage',
-        body: `Memory usage is ${memoryUsage}%, above your ${memoryThreshold}% limit.`,
-      });
+    memoryUsage = Math.round(
+        ((totalMemory - os.freemem()) / totalMemory) * 100
+    );
 
-      notification.on('show', () => console.log('Notification shown'));
-      notification.on('failed', (_event, error) =>
-        console.error('Notification failed:', error)
-      );
+    // Memory threshold and desktop notifications
+    if (
+        memoryUsage >= settings.memoryThreshold &&
+        !memoryAlertActive
+    ) {
+        memoryAlertActive = true;
 
-      notification.show();
+        console.log(
+            `Threshold crossed: ${memoryUsage}% >= ${settings.memoryThreshold}%`
+        );
+
+        if (settings.notificationsEnabled) {
+            if (!Notification.isSupported()) {
+                console.error('Desktop notifications are not supported');
+            } else {
+                const notification = new Notification({
+                    title: 'High memory usage',
+                    body: `Memory usage is ${memoryUsage}%, above your ${settings.memoryThreshold}% limit.`,
+                });
+
+                notification.on('show', () => {
+                    console.log('Notification shown');
+                });
+
+                notification.on('failed', (_event, error) => {
+                    console.error('Notification failed:', error);
+                });
+
+                notification.show();
+            }
+        }
+    } else if (memoryUsage < settings.memoryThreshold) {
+        memoryAlertActive = false;
     }
-  } else if (memoryUsage < memoryThreshold) {
-    memoryAlertActive = false;
-  }
 
-  const totalDiff = currentCpuTimes.total - previousCpuTimes.total;
-  const idleDiff = currentCpuTimes.idle - previousCpuTimes.idle;
+    // CPU calculation
+    const totalDiff =
+        currentCpuTimes.total - previousCpuTimes.total;
 
-  if (totalDiff > 0) {
-    cpuUsage = Math.round((1 - idleDiff / totalDiff) * 100);
-  }
+    const idleDiff =
+        currentCpuTimes.idle - previousCpuTimes.idle;
 
-  previousCpuTimes = currentCpuTimes;
+    if (totalDiff > 0) {
+        cpuUsage = Math.round(
+            (1 - idleDiff / totalDiff) * 100
+        );
+    }
 
-  // Record threshold events for the HTTP API log feed
-  recordApiThresholdEvent('cpu-high', cpuUsage >= 90, `High CPU usage: ${cpuUsage}%`);
-  recordApiThresholdEvent('memory-high', memoryUsage >= memoryThreshold, `High memory usage: ${memoryUsage}%`);
+    previousCpuTimes = currentCpuTimes;
 
-  tray?.setToolTip(
-    `CPU: ${cpuUsage}% | Memory: ${memoryUsage}% | Battery: ${batteryStatus?.hasBattery ? `${batteryStatus.percent}% (${batteryStatus.acConnected ? 'Plugged in' : 'Not plugged in'})` : 'Unavailable'}`
-  );
+    // Existing API threshold logging
+    recordApiThresholdEvent(
+        'cpu-high',
+        cpuUsage >= 90,
+        `High CPU usage: ${cpuUsage}%`
+    );
 
-  // Broadcast to ALL open windows (settings, popover, any future window)
-  broadcastToAllWindows('cpu-usage', cpuUsage);
-  broadcastToAllWindows('memory-usage', memoryUsage);
+    recordApiThresholdEvent(
+        'memory-high',
+        memoryUsage >= settings.memoryThreshold,
+        `High memory usage: ${memoryUsage}%`
+    );
+
+    // Tray tooltip
+    tray?.setToolTip(
+        `CPU: ${cpuUsage}% | Memory: ${memoryUsage}% | Battery: ${
+            batteryStatus?.hasBattery
+                ? `${batteryStatus.percent}% (${batteryStatus.acConnected ? 'Plugged in' : 'Not plugged in'})`
+                : 'Unavailable'
+        }`
+    );
+
+    // Renderer updates
+    broadcastToAllWindows('cpu-usage', cpuUsage);
+    broadcastToAllWindows('memory-usage', memoryUsage);
 }
 
 ipcMain.handle('get-system-monitor-state', async () => {
-  if (!batteryStatus) {
-    await updateBatteryStatus();
-  }
+    if (!batteryStatus) {
+        await updateBatteryStatus();
+    }
 
-  return {
-    cpuUsage,
-    memoryUsage,
-    batteryStatus: batteryStatus
-      ? {
-          hasBattery: Boolean(batteryStatus.hasBattery),
-          percent: batteryStatus.hasBattery ? Math.round(batteryStatus.percent) : null,
-          acConnected: Boolean(batteryStatus.acConnected),
-        }
-      : null,
-    logs: apiLogs.slice(0, 5),
-  };
+    const powerEvents = await getPowerEvents(powerEventsFilePath);
+
+    return {
+        cpuUsage,
+        memoryUsage,
+        batteryStatus: batteryStatus
+            ? {
+                hasBattery: Boolean(batteryStatus.hasBattery),
+                percent: batteryStatus.hasBattery
+                    ? Math.round(batteryStatus.percent)
+                    : null,
+                acConnected: Boolean(batteryStatus.acConnected),
+            }
+            : null,
+        logs: apiLogs.slice(0, 5),
+        powerEvents,
+    };
 });
 
 // ─── Standalone HTTP API server (port 5175) ───────────────────────────────────
@@ -509,8 +576,9 @@ function serveDashboardFile(req, res, pathname) {
   });
 }
 
+
 function startApiServer() {
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     // Allow any origin so the CEF renderer can fetch without CORS errors
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -529,6 +597,16 @@ function startApiServer() {
       return;
     }
 
+    // Fetch saved power events from the JSON database
+    let powerEvents = [];
+
+    try {
+      powerEvents = await getPowerEvents(powerEventsFilePath);
+    } catch (error) {
+      console.error('Failed to load power events:', error);
+    }
+
+    // Send the metrics and power events to the dashboard
     res.writeHead(200, {
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'no-store',
@@ -540,39 +618,241 @@ function startApiServer() {
       batteryStatus: batteryStatus
         ? {
             hasBattery: Boolean(batteryStatus.hasBattery),
-            percent: batteryStatus.hasBattery ? Math.round(batteryStatus.percent) : null,
+            percent: batteryStatus.hasBattery
+              ? Math.round(batteryStatus.percent)
+              : null,
             acConnected: Boolean(batteryStatus.acConnected),
           }
         : null,
       logs: apiLogs,
+      powerEvents,
     }));
   });
 
   return new Promise((resolve) => {
     server.once('error', (err) => {
-      console.error(`[System Monitor] Could not start dashboard/API server on ${API_HOST}:${API_PORT}: ${err.message}`);
+      console.error(
+        `[System Monitor] Could not start dashboard/API server on ${API_HOST}:${API_PORT}: ${err.message}`
+      );
       resolve(false);
     });
 
     server.listen(API_PORT, API_HOST, () => {
-      console.log(`[System Monitor] Dashboard and API server listening on http://${API_HOST}:${API_PORT}`);
+      console.log(
+        `[System Monitor] Dashboard and API server listening on http://${API_HOST}:${API_PORT}`
+      );
       resolve(true);
     });
   });
 }
 
+
+function setupPowerEvents() {
+    powerMonitor.on('suspend', () => {
+        recordPowerEvent('sleep', 'System entered sleep');
+    });
+
+    powerMonitor.on('resume', () => {
+        recordPowerEvent('wake', 'System resumed from sleep');
+    });
+
+    powerMonitor.on('lock-screen', () => {
+        recordPowerEvent('lock', 'Screen locked');
+    });
+
+    powerMonitor.on('unlock-screen', () => {
+        recordPowerEvent('unlock', 'Screen unlocked');
+    });
+
+    powerMonitor.on('on-ac', () => {
+        recordPowerEvent('on-ac', 'Connected to AC power');
+    });
+
+    powerMonitor.on('on-battery', () => {
+        recordPowerEvent('on-battery', 'Switched to battery power');
+    });
+}
+
+async function recordPowerEvent(type, description) {
+    try {
+        const event = await addPowerEvent(
+            powerEventsFilePath,
+            type,
+            description
+        );
+
+        // Notify all Electron renderer windows.
+        broadcastToAllWindows('power-event', event);
+
+        console.log('Power event recorded:', event.description);
+
+        return event;
+
+    } catch (error) {
+        console.error('Could not record power event:', error);
+        return null;
+    }
+}
+
+function startMonitoring() {
+    if (monitoringTimer) {
+        clearInterval(monitoringTimer);
+        monitoringTimer = null;
+    }
+
+    if (settings.monitoringEnabled) {
+        monitoringTimer = setInterval(
+            updateSystemUsage,
+            settings.refreshInterval
+        );
+    }
+}
+
+function applySettingsPatch(patch) {
+    const result = updateSettings(settings, patch);
+
+    if (!result.ok) {
+        return result;
+    }
+
+    try {
+        // Save before replacing the active settings.
+        saveSettings(settingsFilePath, result.settings);
+
+        settings = result.settings;
+
+        if (memoryUsage < settings.memoryThreshold) {
+            memoryAlertActive = false;
+        }
+
+        configureStartup(settings.openAtLogin);
+        startMonitoring();
+
+        return {
+            ok: true,
+            settings,
+            errors: [],
+        };
+
+    } catch (error) {
+        console.error('Could not save settings:', error);
+
+        return {
+            ok: false,
+            settings,
+            errors: [`Could not save settings: ${error.message}`],
+        };
+    }
+}
+
+ipcMain.handle('power-events:get', async () => {
+    return await getPowerEvents(powerEventsFilePath);
+});
+
+ipcMain.handle('power-events:update', async (_event, id, updates) => {
+    try {
+        const event = await updatePowerEvent(
+            powerEventsFilePath,
+            id,
+            updates
+        );
+
+        broadcastToAllWindows('power-events-updated');
+
+        return { ok: true, event };
+
+    } catch (error) {
+        return { ok: false, error: error.message };
+    }
+});
+
+ipcMain.handle('power-events:delete', async (_event, id) => {
+    try {
+        await deletePowerEvent(powerEventsFilePath, id);
+
+        broadcastToAllWindows('power-events-updated');
+
+        return { ok: true };
+
+    } catch (error) {
+        return { ok: false, error: error.message };
+    }
+});
+
+ipcMain.handle('settings:get', () => {
+    return settings;
+});
+
+ipcMain.handle('settings:update', (_event, patch) => {
+    return applySettingsPatch(patch);
+});
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
-    configureStartup(openWhenLogedIn);
-    if (process.platform === 'darwin') app.dock.hide();
-    await startApiServer();
-    createTray();
+    const userDataPath = app.getPath('userData');
 
-    updateSystemUsage();
-    setInterval(updateSystemUsage, 1000);
+    settingsFilePath = path.join(
+        userDataPath,
+        'settings.json'
+    );
+
+    powerEventsFilePath = path.join(
+        userDataPath,
+        'power-events.json'
+    );
+
+    // Load settings
+    const loadedSettings = loadSettings(settingsFilePath);
+
+    settings = loadedSettings.settings;
+
+    console.log('Settings status:', loadedSettings.status);
+
+    if (loadedSettings.errors.length > 0) {
+        console.warn('Settings errors:', loadedSettings.errors);
+    }
+
+    if (
+        loadedSettings.status === 'missing' ||
+        loadedSettings.status === 'repaired'
+    ) {
+        try {
+            saveSettings(settingsFilePath, settings);
+        } catch (error) {
+            console.error('Could not initialize settings:', error);
+        }
+    }
+
+    // Initialize/read power events database
+    try {
+        await getPowerEvents(powerEventsFilePath);
+    } catch (error) {
+        console.error('Could not initialize power events database:', error);
+    }
+
+    configureStartup(settings.openAtLogin);
+
+    if (process.platform === 'darwin') {
+        app.dock.hide();
+    }
+
+    await startApiServer();
+
+    createTray();
+    setupPowerEvents();
+
+    if (settings.monitoringEnabled) {
+        updateSystemUsage();
+    }
+
+    startMonitoring();
+
     updateBatteryStatus();
-    setInterval(updateBatteryStatus, 10000);
+
+    batteryTimer = setInterval(
+        updateBatteryStatus,
+        10000
+    );
 });
 
 // Keep the tray application alive when its windows are closed.
