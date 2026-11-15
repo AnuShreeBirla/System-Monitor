@@ -5,9 +5,6 @@ import si from 'systeminformation'
 
 function systemMonitorApi() {
   let previousCpu = readCpuTimes()
-  let nextEventId = 1
-  const logs = []
-  const alertState = new Map()
 
   function readCpuTimes() {
     return os.cpus().reduce((totals, cpu) => {
@@ -15,19 +12,6 @@ function systemMonitorApi() {
       totals.total += Object.values(cpu.times).reduce((sum, value) => sum + value, 0)
       return totals
     }, { idle: 0, total: 0 })
-  }
-
-  function recordThresholdEvent(key, active, eventType) {
-    if (alertState.get(key) === active) return
-    alertState.set(key, active)
-    if (!active) return
-
-    logs.unshift({
-      id: nextEventId++,
-      eventType,
-      timestamp: new Date().toLocaleString(),
-    })
-    logs.splice(20)
   }
 
   return {
@@ -65,14 +49,6 @@ function systemMonitorApi() {
             console.warn('System Monitor battery read failed:', error.message)
           }
 
-          recordThresholdEvent('cpu-high', cpuUsage >= 90, `High CPU usage: ${cpuUsage}%`)
-          recordThresholdEvent('memory-high', memoryUsage >= 80, `High memory usage: ${memoryUsage}%`)
-          recordThresholdEvent(
-            'battery-low',
-            batteryStatus?.hasBattery && batteryStatus.percent <= 20 && !batteryStatus.acConnected,
-            `Low battery: ${batteryStatus?.percent ?? 0}%`,
-          )
-
           response.statusCode = 200
           response.setHeader('Content-Type', 'application/json; charset=utf-8')
           response.setHeader('Cache-Control', 'no-store')
@@ -80,7 +56,6 @@ function systemMonitorApi() {
             cpuUsage,
             memoryUsage,
             batteryStatus,
-            logs,
           }))
         } catch (error) {
           response.statusCode = 500
