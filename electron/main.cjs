@@ -133,14 +133,6 @@ function createTray() {
             }
         },
         {
-            label: 'Pause Monitoring',
-            type: 'checkbox',
-            checked: false,
-            click: (item) => {
-                console.log('Monitoring paused:', item.checked);
-            }
-        },
-        {
             label: 'Open Settings',
             click: () => createSettingsWindow()
         },
