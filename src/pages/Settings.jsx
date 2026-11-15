@@ -129,9 +129,9 @@ function Settings() {
                 <div className="threshold-control">
                     <input
                         type="range"
-                        min="50"
+                        min="1"
                         max="100"
-                        step="5"
+                        step="1"
                         value={settings.memoryThreshold}
                         onChange={(e) =>
                             handleChange("memoryThreshold", Number(e.target.value))
@@ -139,7 +139,7 @@ function Settings() {
                     />
 
                     <div className="range-labels">
-                        <span>50%</span>
+                        <span>1%</span>
                         <span>100%</span>
                     </div>
                 </div>
