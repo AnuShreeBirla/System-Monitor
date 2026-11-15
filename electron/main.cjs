@@ -10,11 +10,7 @@ const {
   powerMonitor
 } = require('electron');
 const {
-    DEFAULT_SETTINGS,
-    REFRESH_INTERVAL_MIN,
-    REFRESH_INTERVAL_MAX,
     cloneDefaults,
-    validatePatch,
     updateSettings,
     loadSettings,
     saveSettings
@@ -29,16 +25,12 @@ const {
     closeDatabase,
 } = require('./backend/database.cjs');
 
-// Constants
-const openWhenLogedIn = true;
-
 // Variables
 let mainWindow = null;
 let tray = null;
 let settingsWindow = null;
 let isQuitting = false;
 let memoryUsage = 0;
-let memoryThreshold = 80;
 let memoryAlertActive = false;
 let settings = cloneDefaults();
 let settingsFilePath = null;
