@@ -50,6 +50,13 @@ function Dashboard() {
         setCpuUsage(stats.cpuUsage);
         setMemoryUsage(stats.memoryUsage);
         setBatteryStatus(stats.batteryStatus);
+
+        const eventsResponse = await fetch(
+          'http://127.0.0.1:5174/api/power-events'
+        ).catch(() => null);
+        if (active && eventsResponse?.ok) {
+          setLogs(await eventsResponse.json());
+        }
       } catch (error) {
         console.error('Could not load dashboard stats:', error);
       }

@@ -9,6 +9,7 @@ const {
   Notification,
   powerMonitor
 } = require('electron');
+const http = require('http');
 const {
     cloneDefaults,
     updateSettings,
@@ -35,6 +36,47 @@ let memoryAlertActive = false;
 let settings = cloneDefaults();
 let settingsFilePath = null;
 let monitoringTimer = null;
+let unityApiServer = null;
+
+function startUnityApiServer() {
+    const unityOrigin = 'http://127.0.0.1:5173';
+
+    unityApiServer = http.createServer((request, response) => {
+        if (request.headers.origin === unityOrigin) {
+            response.setHeader('Access-Control-Allow-Origin', unityOrigin);
+            response.setHeader('Vary', 'Origin');
+        }
+
+        if (request.method === 'OPTIONS') {
+            response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+            response.writeHead(204);
+            response.end();
+            return;
+        }
+
+        if (request.method !== 'GET' || request.url !== '/api/power-events') {
+            response.writeHead(404);
+            response.end();
+            return;
+        }
+
+        try {
+            const powerEvents = getPowerEvents();
+            response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            response.end(JSON.stringify(powerEvents));
+        } catch (error) {
+            console.error('Could not load Unity power events:', error.message);
+            response.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            response.end(JSON.stringify({ error: 'Could not load power events' }));
+        }
+    });
+
+    unityApiServer.on('error', (error) => {
+        console.error('Unity power-event API unavailable:', error.message);
+    });
+
+    unityApiServer.listen(5174, '127.0.0.1');
+}
 
 // Retrieve current settings
 ipcMain.handle('settings:get', () => {
@@ -341,6 +383,7 @@ function startMonitoring() {
 
 app.whenReady().then(() => {
     initializeDatabase(path.join(app.getPath('userData'), 'power-events.db'));
+    startUnityApiServer();
     settingsFilePath = path.join(app.getPath('userData'), 'settings.json');
 
     const loaded = loadSettings(settingsFilePath);
@@ -370,6 +413,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
     isQuitting = true;
+    if (unityApiServer?.listening) unityApiServer.close();
     closeDatabase();
 });
 

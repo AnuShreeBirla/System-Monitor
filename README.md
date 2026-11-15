@@ -140,6 +140,7 @@ The Unity application is separate from the Electron application. It displays the
 ### How the integration works
 
 - The Vite development server provides a local API for CPU, memory, and battery statistics.
+- Electron provides the Unity dashboard's power-event API at `http://127.0.0.1:5174/api/power-events`; it reads the latest five events from SQLite.
 - The Unity browser surface loads the React dashboard from that same server.
 - The dashboard uses Electron IPC in the desktop app and the local API when opened in Unity's browser.
 
