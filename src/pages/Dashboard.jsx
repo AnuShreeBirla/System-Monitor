@@ -1,4 +1,4 @@
-// dashboard
+// dashboard.jsx
 
 import './Dashboard.css';
 import { useEffect, useState } from 'react';

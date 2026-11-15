@@ -1,4 +1,4 @@
-// settings
+// settings.jsx
 
 import "./Setting.css";
 import { useState, useEffect } from "react";

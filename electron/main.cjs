@@ -1,4 +1,4 @@
-// main
+// main.cjs
 // Modules
 const {
   app,

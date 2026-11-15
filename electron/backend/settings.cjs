@@ -1,4 +1,4 @@
-// settings.js
+// settings.cjs
 const fs = require('fs');
 const path = require('path');
 
