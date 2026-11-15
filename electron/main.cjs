@@ -1,47 +1,55 @@
-// main.cjs
+// // main.cjs
 // Modules
 const {
-  app,
-  BrowserWindow,
-  Tray,
-  Menu,
-  ipcMain,
-  Notification,
-  powerMonitor
+    app,
+    BrowserWindow,
+    Tray,
+    Menu,
+    ipcMain,
+    Notification,
+    powerMonitor
 } = require('electron');
+
 const http = require('http');
+const os = require('os');
+const path = require('path');
+const si = require('systeminformation');
+
 const {
     cloneDefaults,
     updateSettings,
     loadSettings,
     saveSettings
-} = require('./backend/settings.cjs')
-const os = require('os');
-const path = require('path');
-const si = require('systeminformation');
+} = require('./backend/settings.cjs');
+
 const {
-    initializeDatabase,
     addPowerEvent,
-    getPowerEvents,
-    closeDatabase,
-} = require('./backend/database.cjs');
+    getPowerEvents
+} = require('./backend/powerEvents.cjs');
+
 
 // Variables
 let mainWindow = null;
 let tray = null;
 let settingsWindow = null;
 let isQuitting = false;
+
 let memoryUsage = 0;
 let memoryAlertActive = false;
+
 let settings = cloneDefaults();
 let settingsFilePath = null;
+let powerEventsFilePath = null;
+
 let monitoringTimer = null;
 let unityApiServer = null;
 
+
+// Unity API Server
 function startUnityApiServer() {
     const unityOrigin = 'http://127.0.0.1:5173';
 
-    unityApiServer = http.createServer((request, response) => {
+    unityApiServer = http.createServer(async (request, response) => {
         if (request.headers.origin === unityOrigin) {
             response.setHeader('Access-Control-Allow-Origin', unityOrigin);
             response.setHeader('Vary', 'Origin');
@@ -55,20 +63,40 @@ function startUnityApiServer() {
         }
 
         const requestUrl = new URL(request.url, 'http://127.0.0.1');
-        if (request.method !== 'GET' || requestUrl.pathname !== '/api/power-events') {
+
+        if (
+            request.method !== 'GET' ||
+            requestUrl.pathname !== '/api/power-events'
+        ) {
             response.writeHead(404);
             response.end();
             return;
         }
 
         try {
-            const powerEvents = getPowerEvents(requestUrl.searchParams.get('limit') || '5');
-            response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            const limit = requestUrl.searchParams.get('limit') || '5';
+
+            const powerEvents = await getPowerEvents(
+                powerEventsFilePath,
+                limit
+            );
+
+            response.writeHead(200, {
+                'Content-Type': 'application/json; charset=utf-8'
+            });
+
             response.end(JSON.stringify(powerEvents));
+
         } catch (error) {
             console.error('Could not load Unity power events:', error.message);
-            response.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-            response.end(JSON.stringify({ error: 'Could not load power events' }));
+
+            response.writeHead(500, {
+                'Content-Type': 'application/json; charset=utf-8'
+            });
+
+            response.end(JSON.stringify({
+                error: 'Could not load power events'
+            }));
         }
     });
 
@@ -79,14 +107,20 @@ function startUnityApiServer() {
     unityApiServer.listen(5174, '127.0.0.1');
 }
 
-// Retrieve current settings
+
+// IPC: Retrieve Settings
 ipcMain.handle('settings:get', () => {
     return settings;
 });
 
-ipcMain.handle('get-power-events', (_event, limit) => getPowerEvents(limit));
 
-// Update and save settings
+// IPC: Retrieve Power Events
+ipcMain.handle('get-power-events', (_event, limit) => {
+    return getPowerEvents(powerEventsFilePath, limit);
+});
+
+
+// IPC: Update and Save Settings
 ipcMain.handle('settings:update', (_event, patch) => {
     const result = updateSettings(settings, patch);
 
@@ -115,30 +149,32 @@ ipcMain.handle('settings:update', (_event, patch) => {
         return {
             ok: true,
             settings,
-            errors: [],
+            errors: []
         };
 
     } catch (error) {
         return {
             ok: false,
             settings,
-            errors: [`Could not save settings: ${error.message}`],
+            errors: [`Could not save settings: ${error.message}`]
         };
     }
 });
 
+
+// Main Window
 function createWindow(options = {}) {
     mainWindow = new BrowserWindow({
-      width: 900,
-      height: 600,
-      show: options.show ?? true,
-      webPreferences: {
-        preload: path.join(__dirname, "preload.cjs"),
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
+        width: 900,
+        height: 600,
+        show: options.show ?? true,
+
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.cjs'),
+            contextIsolation: true,
+            nodeIntegration: false
+        }
     });
-    
 
     mainWindow.loadURL('http://localhost:5173/#/');
 
@@ -151,6 +187,8 @@ function createWindow(options = {}) {
     });
 }
 
+
+// System Tray
 function createTray() {
     const iconPath = path.join(
         __dirname,
@@ -192,32 +230,63 @@ function createTray() {
     });
 }
 
+
+// Power Events
 function setupPowerEvents() {
     const events = {
-        'suspend': { type: 'sleep', description: 'System entered sleep mode' },
-        'resume': { type: 'wake', description: 'System woke from sleep' },
-        'lock-screen': { type: 'lock', description: 'Screen locked' },
-        'unlock-screen': { type: 'unlock', description: 'Screen unlocked' },
-        'on-ac': { type: 'battery plugged in', description: 'Battery connected to power' },
-        'on-battery': { type: 'charging stopped', description: 'Charging stopped after switching to battery power' }
+        'suspend': {
+            type: 'sleep',
+            description: 'System entered sleep mode'
+        },
+        'resume': {
+            type: 'wake',
+            description: 'System woke from sleep'
+        },
+        'lock-screen': {
+            type: 'lock',
+            description: 'Screen locked'
+        },
+        'unlock-screen': {
+            type: 'unlock',
+            description: 'Screen unlocked'
+        },
+        'on-ac': {
+            type: 'battery plugged in',
+            description: 'Battery connected to power'
+        },
+        'on-battery': {
+            type: 'charging stopped',
+            description: 'Charging stopped after switching to battery power'
+        }
     };
 
     Object.entries(events).forEach(([eventName, eventDetails]) => {
-        powerMonitor.on(eventName, () => {
-            const log = addPowerEvent(eventDetails.type, eventDetails.description);
+        powerMonitor.on(eventName, async () => {
+            try {
+                const log = await addPowerEvent(
+                    powerEventsFilePath,
+                    eventDetails.type,
+                    eventDetails.description
+                );
 
-            console.log('Power Event:', log);
+                console.log('Power Event:', log);
 
-            // Send event to renderer windows
-            BrowserWindow.getAllWindows().forEach((win) => {
-                if (!win.isDestroyed()) {
-                    win.webContents.send('power-event', log);
-                }
-            });
+                // Send event to renderer windows
+                BrowserWindow.getAllWindows().forEach((win) => {
+                    if (!win.isDestroyed()) {
+                        win.webContents.send('power-event', log);
+                    }
+                });
+
+            } catch (error) {
+                console.error('Could not save power event:', error.message);
+            }
         });
     });
 }
 
+
+// Settings Window
 function createSettingsWindow() {
 
     // If Settings is already open, reuse it
@@ -234,7 +303,6 @@ function createSettingsWindow() {
     }
 
     settingsWindow = new BrowserWindow({
-
         width: 600,
         height: 500,
 
@@ -246,7 +314,6 @@ function createSettingsWindow() {
             contextIsolation: true,
             nodeIntegration: false
         }
-
     });
 
     // Development
@@ -259,11 +326,11 @@ function createSettingsWindow() {
     settingsWindow.on('closed', () => {
         settingsWindow = null;
     });
-
 }
 
-function configureStartup(open) {
 
+// Startup Configuration
+function configureStartup(open) {
     app.setLoginItemSettings({
         openAtLogin: open
     });
@@ -276,32 +343,47 @@ function configureStartup(open) {
     return startHidden;
 }
 
+
+// CPU Monitoring
 let cpuUsage = 0;
 let previousCpuTimes = getCpuTimes();
 
 function getCpuTimes() {
-  let total = 0;
-  let idle = 0;
+    let total = 0;
+    let idle = 0;
 
-  for (const cpu of os.cpus()) {
-    idle += cpu.times.idle;
-    total += Object.values(cpu.times).reduce((sum, time) => sum + time, 0);
-  }
+    for (const cpu of os.cpus()) {
+        idle += cpu.times.idle;
 
-  return { total, idle };
+        total += Object.values(cpu.times).reduce(
+            (sum, time) => sum + time,
+            0
+        );
+    }
+
+    return { total, idle };
 }
 
+
+// Battery Monitoring
 let batteryStatus = null;
 
 async function updateBatteryStatus() {
-  try {
-    batteryStatus = await si.battery();
-    mainWindow?.webContents.send('battery-status', batteryStatus);
-  } catch (error) {
-    console.error('Could not read battery status:', error.message);
-  }
+    try {
+        batteryStatus = await si.battery();
+
+        mainWindow?.webContents.send(
+            'battery-status',
+            batteryStatus
+        );
+
+    } catch (error) {
+        console.error('Could not read battery status:', error.message);
+    }
 }
 
+
+// System Usage Monitoring
 function updateSystemUsage() {
     const currentCpuTimes = getCpuTimes();
 
@@ -326,7 +408,7 @@ function updateSystemUsage() {
             } else {
                 const notification = new Notification({
                     title: 'High memory usage',
-                    body: `Memory usage is ${memoryUsage}%, above your ${settings.memoryThreshold}% limit.`,
+                    body: `Memory usage is ${memoryUsage}%, above your ${settings.memoryThreshold}% limit.`
                 });
 
                 notification.on('show', () =>
@@ -340,6 +422,7 @@ function updateSystemUsage() {
                 notification.show();
             }
         }
+
     } else if (memoryUsage < settings.memoryThreshold) {
         memoryAlertActive = false;
     }
@@ -349,7 +432,9 @@ function updateSystemUsage() {
     const idleDiff = currentCpuTimes.idle - previousCpuTimes.idle;
 
     if (totalDiff > 0) {
-        cpuUsage = Math.round((1 - idleDiff / totalDiff) * 100);
+        cpuUsage = Math.round(
+            (1 - idleDiff / totalDiff) * 100
+        );
     }
 
     previousCpuTimes = currentCpuTimes;
@@ -368,6 +453,8 @@ function updateSystemUsage() {
     mainWindow?.webContents.send('memory-usage', memoryUsage);
 }
 
+
+// Start Monitoring
 function startMonitoring() {
     if (monitoringTimer) {
         clearInterval(monitoringTimer);
@@ -382,12 +469,35 @@ function startMonitoring() {
     }
 }
 
-app.whenReady().then(() => {
-    initializeDatabase(path.join(app.getPath('userData'), 'power-events.db'));
-    startUnityApiServer();
-    settingsFilePath = path.join(app.getPath('userData'), 'settings.json');
 
+// Application Startup
+app.whenReady().then(async () => {
+
+    // Set storage paths
+    const userDataPath = app.getPath('userData');
+
+    settingsFilePath = path.join(
+        userDataPath,
+        'settings.json'
+    );
+
+    powerEventsFilePath = path.join(
+        userDataPath,
+        'powerEvents.json'
+    );
+
+    // Initialize JSON file if it does not exist
+    try {
+        await getPowerEvents(powerEventsFilePath, '5');
+    } catch (error) {
+        console.error('Could not initialize power events:', error.message);
+    }
+
+    startUnityApiServer();
+
+    // Load Settings
     const loaded = loadSettings(settingsFilePath);
+
     settings = loaded.settings;
 
     console.log('Settings status:', loaded.status);
@@ -412,14 +522,24 @@ app.whenReady().then(() => {
     setInterval(updateBatteryStatus, 10000);
 });
 
+
+// Application Shutdown
 app.on('before-quit', () => {
     isQuitting = true;
-    if (unityApiServer?.listening) unityApiServer.close();
-    closeDatabase();
+
+    if (unityApiServer?.listening) {
+        unityApiServer.close();
+    }
 });
 
+
+// macOS Activation
 app.on('activate', () => {
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+    if (
+        mainWindow &&
+        !mainWindow.isDestroyed() &&
+        !mainWindow.isVisible()
+    ) {
         mainWindow.show();
     }
 });
