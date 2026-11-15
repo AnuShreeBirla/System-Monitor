@@ -163,8 +163,8 @@ function setupPowerEvents() {
         'resume': { type: 'wake', description: 'System woke from sleep' },
         'lock-screen': { type: 'lock', description: 'Screen locked' },
         'unlock-screen': { type: 'unlock', description: 'Screen unlocked' },
-        'on-ac': { type: 'on-ac', description: 'Power source changed to AC' },
-        'on-battery': { type: 'on-battery', description: 'Power source changed to battery' }
+        'on-ac': { type: 'battery plugged in', description: 'Battery connected to power' },
+        'on-battery': { type: 'charging stopped', description: 'Charging stopped after switching to battery power' }
     };
 
     Object.entries(events).forEach(([eventName, eventDetails]) => {
