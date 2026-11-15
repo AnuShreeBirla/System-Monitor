@@ -167,14 +167,14 @@ The Unity application must be built separately using the Unity project files.
 
 ## 6. Data Storage
 
-Application settings and power-event history are stored as JSON files in Electron's application-specific user data directory.
+Application data is stored in Electron's application-specific user data directory.
 
-The databases are created automatically when the application starts.
+The files are created automatically when the application starts.
 
-| Database | Purpose |
+| File | Purpose |
 |---|---|
 | `settings.json` | Stores monitoring preferences, memory threshold, refresh interval, startup preference, and notification settings. |
-| `power-events.json` | Stores recorded system power events. |
+| `power-events.db` | SQLite database that stores power events in the `power_events` table. The dashboard displays the latest five events. |
 
 These files are stored outside the cloned repository, so application data persists independently of source-code changes and Git operations.
 
