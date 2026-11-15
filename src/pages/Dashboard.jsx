@@ -3,6 +3,13 @@
 import './Dashboard.css';
 import { useEffect, useState } from 'react';
 
+function formatTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  const pad = (value) => String(value).padStart(2, '0');
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 function Dashboard() {
   const [cpuUsage, setCpuUsage] = useState(null);
   const [memoryUsage, setMemoryUsage] = useState(null);
@@ -116,7 +123,7 @@ function Dashboard() {
                 <tr key={log.id}>
                   <td>{`evt_${String(log.id).padStart(3, '0')}`}</td>
                   <td>{log.eventType}</td>
-                  <td>{log.timestamp}</td>
+                  <td>{formatTimestamp(log.timestamp)}</td>
                 </tr>
               ))
             ) : (
