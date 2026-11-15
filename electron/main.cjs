@@ -19,16 +19,15 @@ const {
     loadSettings,
     saveSettings
 } = require('./backend/settings.cjs')
-const {
-      addPowerEvent,
-    getPowerEvents,
-    updatePowerEvent,
-    deletePowerEvent
-} = require('./backend/powerEvents.cjs')
 const os = require('os');
 const path = require('path');
 const si = require('systeminformation');
-const { initializeDatabase } = require('./backend/database.cjs');
+const {
+    initializeDatabase,
+    addPowerEvent,
+    getPowerEvents,
+    closeDatabase,
+} = require('./backend/database.cjs');
 
 // Constants
 const openWhenLogedIn = true;
@@ -49,6 +48,8 @@ let monitoringTimer = null;
 ipcMain.handle('settings:get', () => {
     return settings;
 });
+
+ipcMain.handle('get-power-events', () => getPowerEvents());
 
 // Update and save settings
 ipcMain.handle('settings:update', (_event, patch) => {
@@ -158,21 +159,17 @@ function createTray() {
 
 function setupPowerEvents() {
     const events = {
-        'suspend': 'System Sleep',
-        'resume': 'System Wake',
-        'lock-screen': 'Screen Locked',
-        'unlock-screen': 'Screen Unlocked',
-        'on-ac': 'Connected to AC Power',
-        'on-battery': 'Switched to Battery'
+        'suspend': { type: 'sleep', description: 'System entered sleep mode' },
+        'resume': { type: 'wake', description: 'System woke from sleep' },
+        'lock-screen': { type: 'lock', description: 'Screen locked' },
+        'unlock-screen': { type: 'unlock', description: 'Screen unlocked' },
+        'on-ac': { type: 'on-ac', description: 'Power source changed to AC' },
+        'on-battery': { type: 'on-battery', description: 'Power source changed to battery' }
     };
 
-    Object.entries(events).forEach(([eventName, description]) => {
+    Object.entries(events).forEach(([eventName, eventDetails]) => {
         powerMonitor.on(eventName, () => {
-            const log = {
-                id: Date.now(),
-                eventType: description,
-                timestamp: new Date().toLocaleString()
-            };
+            const log = addPowerEvent(eventDetails.type, eventDetails.description);
 
             console.log('Power Event:', log);
 
@@ -381,6 +378,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
     isQuitting = true;
+    closeDatabase();
 });
 
 app.on('activate', () => {

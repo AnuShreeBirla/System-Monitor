@@ -28,6 +28,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('power-event', listener);
     };
 },
+  getPowerEvents() {
+    return ipcRenderer.invoke('get-power-events');
+  },
   getSettings() {
       return ipcRenderer.invoke('settings:get');
   },

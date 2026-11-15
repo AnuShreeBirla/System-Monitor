@@ -17,8 +17,10 @@ function Dashboard() {
       const removeBatteryListener =
         window.electronAPI.onBatteryStatus(setBatteryStatus);
       const removePowerListener = window.electronAPI.onPowerEvent((log) => {
-        setLogs((previousLogs) => [log, ...previousLogs]);
+        setLogs((previousLogs) => [log, ...previousLogs].slice(0, 5));
       });
+
+      window.electronAPI.getPowerEvents().then(setLogs);
 
       return () => {
         removeCpuListener();
@@ -112,7 +114,7 @@ function Dashboard() {
             {logs.length ? (
               logs.map((log) => (
                 <tr key={log.id}>
-                  <td>{log.id}</td>
+                  <td>{`evt_${String(log.id).padStart(3, '0')}`}</td>
                   <td>{log.eventType}</td>
                   <td>{log.timestamp}</td>
                 </tr>
