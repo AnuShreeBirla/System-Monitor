@@ -28,6 +28,7 @@ const {
 const os = require('os');
 const path = require('path');
 const si = require('systeminformation');
+const { initializeDatabase } = require('./backend/database.cjs');
 
 // Constants
 const openWhenLogedIn = true;
@@ -350,6 +351,7 @@ function startMonitoring() {
 }
 
 app.whenReady().then(() => {
+    initializeDatabase(path.join(app.getPath('userData'), 'power-events.db'));
     settingsFilePath = path.join(app.getPath('userData'), 'settings.json');
 
     const loaded = loadSettings(settingsFilePath);
