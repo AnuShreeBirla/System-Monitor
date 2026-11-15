@@ -135,19 +135,20 @@ The application runs primarily through the macOS menu bar. Use the System Monito
 
 System Monitor also contains a Unity dashboard integration developed as part of the project.
 
-The Unity application is separate from the Electron application and communicates with the Electron backend through a local HTTP API.
+The Unity application is separate from the Electron application. It displays the React dashboard in its browser surface and reads live system information from the local Vite development server API.
 
 ### How the integration works
 
-- Electron collects system information, including CPU, memory, and battery statistics.
-- Electron exposes this information through a local HTTP API.
-- The Unity application retrieves the information from the API and displays it through its dashboard.
-- The React dashboard is also served through the same local server for the Unity integration.
+- The Vite development server provides a local API for CPU, memory, and battery statistics.
+- The Unity browser surface loads the React dashboard from that same server.
+- The dashboard uses Electron IPC in the desktop app and the local API when opened in Unity's browser.
+
+Keep the Vite development server running while using the Unity dashboard.
 
 The API is available at:
 
 ```text
-http://127.0.0.1:5175/api/system-monitor
+http://127.0.0.1:5173/api/system-monitor
 ```
 
 The default Unity application path is configured in `main.cjs`.

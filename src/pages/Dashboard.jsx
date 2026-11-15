@@ -10,27 +10,48 @@ function Dashboard() {
   const [logs,setLogs] = useState([])
 
   useEffect(() => {
-    const removePowerListener =
-        window.electronAPI.onPowerEvent((log) => {
-            setLogs((previousLogs) => [log, ...previousLogs]);
-        });
+    if (window.electronAPI) {
+      const removeCpuListener = window.electronAPI.onCpuUsage(setCpuUsage);
+      const removeMemoryListener =
+        window.electronAPI.onMemoryUsage(setMemoryUsage);
+      const removeBatteryListener =
+        window.electronAPI.onBatteryStatus(setBatteryStatus);
+      const removePowerListener = window.electronAPI.onPowerEvent((log) => {
+        setLogs((previousLogs) => [log, ...previousLogs]);
+      });
 
-    return () => {
+      return () => {
+        removeCpuListener();
+        removeMemoryListener();
+        removeBatteryListener();
         removePowerListener();
-    };
-  }, []);
+      };
+    }
 
-  useEffect(() => {
-    const removeCpuListener = window.electronAPI.onCpuUsage(setCpuUsage);
-    const removeMemoryListener =
-      window.electronAPI.onMemoryUsage(setMemoryUsage);
-    const removeBatteryListener =
-      window.electronAPI.onBatteryStatus(setBatteryStatus);
+    let active = true;
+
+    async function loadBrowserStats() {
+      try {
+        const response = await fetch('/api/system-monitor');
+        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+
+        const stats = await response.json();
+        if (!active) return;
+
+        setCpuUsage(stats.cpuUsage);
+        setMemoryUsage(stats.memoryUsage);
+        setBatteryStatus(stats.batteryStatus);
+      } catch (error) {
+        console.error('Could not load dashboard stats:', error);
+      }
+    }
+
+    loadBrowserStats();
+    const timer = setInterval(loadBrowserStats, 1000);
 
     return () => {
-      removeCpuListener();
-      removeMemoryListener();
-      removeBatteryListener();
+      active = false;
+      clearInterval(timer);
     };
   }, []);
 

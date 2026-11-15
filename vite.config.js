@@ -34,9 +34,6 @@ function systemMonitorApi() {
     name: 'system-monitor-api',
     configureServer(server) {
       server.middlewares.use('/api/system-monitor', async (_request, response) => {
-        // Allow any origin (needed when Unity CEF fetches from a different origin)
-        response.setHeader('Access-Control-Allow-Origin', '*');
-        response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
         response.setHeader('Cache-Control', 'no-store');
         try {
           const currentCpu = readCpuTimes()
@@ -99,4 +96,8 @@ function systemMonitorApi() {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), systemMonitorApi()],
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
 })

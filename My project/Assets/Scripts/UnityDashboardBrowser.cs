@@ -20,7 +20,7 @@ using Resolution = VoltstroStudios.UnityWebBrowser.Shared.Resolution;
 public sealed class UnityDashboardBrowser : MonoBehaviour
 {
     private const string ScreenCanvasName = "TabletScreenCanvas";
-    private const string DashboardUrl = "http://127.0.0.1:5175/#/";
+    private const string DashboardUrl = "http://127.0.0.1:5173/#/";
     private const string SurfaceName = "ReactDashboardSurface";
     private const float DisconnectGraceSeconds = 5f;
     private const float RecoveryCooldownSeconds = 8f;
