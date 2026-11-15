@@ -47,6 +47,18 @@
   border-collapse: collapse;
 }
 
+.logs-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.logs-controls select {
+  padding: 5px 8px;
+  font-size: 16px;
+}
+
 .logs th,
 .logs td {
   width: 33.333%;

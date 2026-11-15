@@ -14,7 +14,8 @@ function Dashboard() {
   const [cpuUsage, setCpuUsage] = useState(null);
   const [memoryUsage, setMemoryUsage] = useState(null);
   const [batteryStatus, setBatteryStatus] = useState(null);
-  const [logs,setLogs] = useState([])
+  const [logs, setLogs] = useState([]);
+  const [logLimit, setLogLimit] = useState('5');
 
   useEffect(() => {
     if (window.electronAPI) {
@@ -23,17 +24,11 @@ function Dashboard() {
         window.electronAPI.onMemoryUsage(setMemoryUsage);
       const removeBatteryListener =
         window.electronAPI.onBatteryStatus(setBatteryStatus);
-      const removePowerListener = window.electronAPI.onPowerEvent((log) => {
-        setLogs((previousLogs) => [log, ...previousLogs].slice(0, 5));
-      });
-
-      window.electronAPI.getPowerEvents().then(setLogs);
 
       return () => {
         removeCpuListener();
         removeMemoryListener();
         removeBatteryListener();
-        removePowerListener();
       };
     }
 
@@ -50,13 +45,6 @@ function Dashboard() {
         setCpuUsage(stats.cpuUsage);
         setMemoryUsage(stats.memoryUsage);
         setBatteryStatus(stats.batteryStatus);
-
-        const eventsResponse = await fetch(
-          'http://127.0.0.1:5174/api/power-events'
-        ).catch(() => null);
-        if (active && eventsResponse?.ok) {
-          setLogs(await eventsResponse.json());
-        }
       } catch (error) {
         console.error('Could not load dashboard stats:', error);
       }
@@ -70,6 +58,38 @@ function Dashboard() {
       clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPowerEvents() {
+      try {
+        if (window.electronAPI) {
+          const events = await window.electronAPI.getPowerEvents(logLimit);
+          if (active) setLogs(events);
+          return;
+        }
+
+        const response = await fetch(
+          `http://127.0.0.1:5174/api/power-events?limit=${encodeURIComponent(logLimit)}`
+        ).catch(() => null);
+
+        if (active && response?.ok) setLogs(await response.json());
+      } catch (error) {
+        console.error('Could not load power events:', error);
+      }
+    }
+
+    loadPowerEvents();
+    const removePowerListener = window.electronAPI?.onPowerEvent(loadPowerEvents);
+    const timer = window.electronAPI ? null : setInterval(loadPowerEvents, 1000);
+
+    return () => {
+      active = false;
+      removePowerListener?.();
+      if (timer) clearInterval(timer);
+    };
+  }, [logLimit]);
 
   return (
     <main className="dashboard">
@@ -115,6 +135,21 @@ function Dashboard() {
 
       <section className="logs">
         <h2>Logs</h2>
+
+        <div className="logs-controls">
+          <label htmlFor="log-limit">Show</label>
+          <select
+            id="log-limit"
+            value={logLimit}
+            onChange={(event) => setLogLimit(event.target.value)}
+          >
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="all">All</option>
+          </select>
+          <span>logs</span>
+        </div>
 
         <table>
           <thead>

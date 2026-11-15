@@ -34,12 +34,19 @@ function addPowerEvent(type, description) {
   };
 }
 
-function getPowerEvents() {
-  return database
-    .prepare(
-      'SELECT id, type AS eventType, timestamp FROM power_events ORDER BY id DESC LIMIT 5'
-    )
-    .all();
+function getPowerEvents(limit = '5') {
+  const query =
+    'SELECT id, type AS eventType, timestamp FROM power_events ORDER BY id DESC';
+
+  if (limit === 'all') {
+    return database.prepare(query).all();
+  }
+
+  const numberOfEvents = [5, 10, 25].includes(Number(limit))
+    ? Number(limit)
+    : 5;
+
+  return database.prepare(`${query} LIMIT ?`).all(numberOfEvents);
 }
 
 function closeDatabase() {

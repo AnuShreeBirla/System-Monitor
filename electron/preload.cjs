@@ -28,8 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('power-event', listener);
     };
 },
-  getPowerEvents() {
-    return ipcRenderer.invoke('get-power-events');
+  getPowerEvents(limit) {
+    return ipcRenderer.invoke('get-power-events', limit);
   },
   getSettings() {
       return ipcRenderer.invoke('settings:get');

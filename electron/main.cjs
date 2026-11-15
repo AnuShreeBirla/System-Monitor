@@ -54,14 +54,15 @@ function startUnityApiServer() {
             return;
         }
 
-        if (request.method !== 'GET' || request.url !== '/api/power-events') {
+        const requestUrl = new URL(request.url, 'http://127.0.0.1');
+        if (request.method !== 'GET' || requestUrl.pathname !== '/api/power-events') {
             response.writeHead(404);
             response.end();
             return;
         }
 
         try {
-            const powerEvents = getPowerEvents();
+            const powerEvents = getPowerEvents(requestUrl.searchParams.get('limit') || '5');
             response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             response.end(JSON.stringify(powerEvents));
         } catch (error) {
@@ -83,7 +84,7 @@ ipcMain.handle('settings:get', () => {
     return settings;
 });
 
-ipcMain.handle('get-power-events', () => getPowerEvents());
+ipcMain.handle('get-power-events', (_event, limit) => getPowerEvents(limit));
 
 // Update and save settings
 ipcMain.handle('settings:update', (_event, patch) => {

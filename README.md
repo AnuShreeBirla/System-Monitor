@@ -175,7 +175,7 @@ The files are created automatically when the application starts.
 | File | Purpose |
 |---|---|
 | `settings.json` | Stores monitoring preferences, memory threshold, refresh interval, startup preference, and notification settings. |
-| `power-events.db` | SQLite database that stores power events in the `power_events` table. The dashboard displays the latest five events. |
+| `power-events.db` | SQLite database that stores power events in the `power_events` table. The dashboard can show 5, 10, 25, or all events. |
 
 These files are stored outside the cloned repository, so application data persists independently of source-code changes and Git operations.
 
