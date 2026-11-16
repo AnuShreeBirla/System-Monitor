@@ -4,7 +4,7 @@ A macOS desktop system-monitoring application built with **Electron, React, and 
 
 System Monitor provides a compact desktop interface for monitoring system resources, viewing battery information, managing monitoring preferences, and keeping track of important system power events.
 
-The project also includes a Unity-based dashboard integration, allowing system metrics to be displayed through a separate Unity application.
+The project also includes a Unity-based dashboard integration, allowing system-monitoring information to be displayed through a separate Unity application.
 
 ---
 
@@ -135,22 +135,19 @@ The application runs primarily through the macOS menu bar. Use the System Monito
 
 System Monitor also contains a Unity dashboard integration developed as part of the project.
 
-The Unity application is separate from the Electron application. It displays the React dashboard in its browser surface and reads live system information from the local Vite development server API.
+The Unity application is separate from the Electron application. It displays the React dashboard through its browser surface and can retrieve power-event information through the local Electron API.
 
 ### How the integration works
 
-- The Vite development server provides a local API for CPU, memory, and battery statistics.
-- Electron provides the Unity dashboard's power-event API at `http://127.0.0.1:5174/api/power-events`; it reads the latest five events from SQLite.
-- The Unity browser surface loads the React dashboard from that same server.
-- The dashboard uses Electron IPC in the desktop app and the local API when opened in Unity's browser.
+- The React dashboard provides the interface for displaying system-monitoring information.
+- Electron handles native system monitoring and exposes power-event information through its local API.
+- The power-event API is available at `http://127.0.0.1:5174/api/power-events`.
+- The Unity browser surface loads the React dashboard.
+- The desktop application uses Electron IPC for communication, while the Unity integration uses the local API where supported.
 
-Keep the Vite development server running while using the Unity dashboard.
+The power-event API retrieves its data from `powerEvents.json`, described in the Data Storage section.
 
-The API is available at:
-
-```text
-http://127.0.0.1:5173/api/system-monitor
-```
+The Unity application must be built separately using the Unity project files.
 
 The default Unity application path is configured in `main.cjs`.
 
@@ -159,8 +156,6 @@ If your Unity build is located elsewhere, you can override the default path usin
 ```bash
 SYSTEM_MONITOR_UNITY_APP_PATH="/path/to/your/My project.app"
 ```
-
-The Unity application must be built separately using the Unity project files.
 
 **Note:** The Unity dashboard is an additional integration. Its build and configuration are separate from the standard Electron development setup.
 
@@ -175,9 +170,113 @@ The files are created automatically when the application starts.
 | File | Purpose |
 |---|---|
 | `settings.json` | Stores monitoring preferences, memory threshold, refresh interval, startup preference, and notification settings. |
-| `power-events.db` | SQLite database that stores power events in the `power_events` table. The dashboard can show 5, 10, 25, or all events. |
+| `powerEvents.json` | Stores the application's power-event history as JSON data. |
 
 These files are stored outside the cloned repository, so application data persists independently of source-code changes and Git operations.
+
+### Power Event Data Structure
+
+Unlike the SQLite implementation, this branch does not use a relational database.
+
+Power events are stored in a JSON file using an array of event objects.
+
+The overall structure is:
+
+```json
+{
+  "powerEvents": [
+    {
+      "id": "evt_<unique-id>",
+      "type": "sleep",
+      "timestamp": "2026-11-16T10:30:00.000Z",
+      "description": "System entered sleep mode"
+    },
+    {
+      "id": "evt_<unique-id>",
+      "type": "wake",
+      "timestamp": "2026-11-16T11:00:00.000Z",
+      "description": "System woke from sleep"
+    }
+  ]
+}
+```
+
+Each event contains the following fields:
+
+| Field | Data type | Description |
+|---|---|---|
+| `id` | String | Unique identifier generated for each event. |
+| `type` | String | Category of the power event. |
+| `timestamp` | String | Date and time when the event occurred, stored in ISO 8601 format. |
+| `description` | String | Additional information describing the event. |
+
+### Supported Power Event Types
+
+The application records the following event categories:
+
+| Event type | Description |
+|---|---|
+| `sleep` | System entered sleep mode. |
+| `wake` | System woke from sleep. |
+| `lock` | Screen locked. |
+| `unlock` | Screen unlocked. |
+| `battery plugged in` | Battery connected to power. |
+| `charging stopped` | Charging stopped after switching to battery power. |
+
+### JSON Data Structure Model
+
+Since this implementation uses JSON files instead of a relational database, a traditional Level 3 ER model with relational tables, primary keys, and foreign keys does not apply.
+
+The following model represents the structure of the stored power-event data:
+
+```text
+powerEvents.json
+│
+└── powerEvents [Array]
+    │
+    ├── Event Object 1
+    │   ├── id          : String
+    │   ├── type        : String
+    │   ├── timestamp   : String
+    │   └── description : String
+    │
+    ├── Event Object 2
+    │   ├── id          : String
+    │   ├── type        : String
+    │   ├── timestamp   : String
+    │   └── description : String
+    │
+    └── Event Object N
+        ├── id          : String
+        ├── type        : String
+        ├── timestamp   : String
+        └── description : String
+```
+
+### Reading and Writing Events
+
+The backend handles power-event storage through `powerEvents.cjs`.
+
+- **Create:** A new event is assigned a unique ID and timestamp, then appended to the `powerEvents` array.
+- **Read:** Events are retrieved from the JSON file and returned in reverse chronological insertion order.
+- **Display:** The dashboard supports selecting the latest **5, 10, 25, or all** recorded events.
+- **Persistence:** Changes are written to the JSON file so that event history remains available after restarting the application.
+
+Write operations are queued to prevent overlapping writes from interfering with one another. Database updates are saved through a temporary file before replacing the original file.
+
+### Settings Storage
+
+Application preferences are stored separately in `settings.json`.
+
+The settings file maintains values such as:
+
+- Memory usage threshold.
+- Monitoring enabled/disabled state.
+- Refresh interval.
+- Open-at-login preference.
+- Desktop notification preference.
+
+The settings and power-event history are handled independently by the backend.
 
 ---
 
@@ -188,6 +287,7 @@ These files are stored outside the cloned repository, so application data persis
 - Do not commit local certificates, private keys, or other signing credentials to the repository.
 - The Unity application must be built separately if you want to use the Unity dashboard.
 - Application settings and power-event history are maintained independently of the Git repository.
+- Power-event storage is handled through JSON file operations in the Electron backend. This branch does not require SQLite for power-event persistence.
 
 ---
 
@@ -198,4 +298,5 @@ These files are stored outside the cloned repository, so application data persis
 - **Node.js** – Backend logic and system monitoring.
 - **Vite** – Frontend development server.
 - **Systeminformation** – System and battery information.
-- **Unity** – Additional 3D dashboard integration.
+- **JSON** – File-based storage for power events and application settings.
+- **Unity** – Additional dashboard integration.
